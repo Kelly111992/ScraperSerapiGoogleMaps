@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { X, Star, MapPin, Phone, Globe, Clock, ChevronRight, MessageSquare } from 'lucide-react';
+import { X, Star, MapPin, Phone, Globe, Clock, ChevronRight, MessageSquare, Facebook, Mail, Users, ThumbsUp } from 'lucide-react';
+import axios from 'axios';
 import { cn } from './PlaceCard';
 
 interface PlaceDetailsModalProps {
@@ -20,13 +21,21 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
     const [details, setDetails] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'info' | 'reviews' | 'photos'>('info');
+    const [activeTab, setActiveTab] = useState<'info' | 'reviews' | 'photos' | 'facebook'>('info');
+
+    // Facebook Integration State
+    const [facebookData, setFacebookData] = useState<any>(null);
+    const [loadingFacebook, setLoadingFacebook] = useState(false);
+    const [facebookError, setFacebookError] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen && placeId) {
             setLoading(true);
             setError(null);
             setDetails(initialData || null); // Show what we have first
+            setFacebookData(null); // Reset FB data
+            setFacebookError(null);
+            setActiveTab('info');
 
             fetchDetails(placeId)
                 .then(data => {
@@ -51,6 +60,73 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
     const displayData = details || initialData || {};
     const { title, rating, reviews, address, phone, website, open_state, hours, thumbnail, photos_link, reviews_link, description, extensions } = displayData;
 
+    // Helper: Extract Facebook ID/Handle from URL
+    const getFacebookId = (url: string): string | null => {
+        if (!url) return null;
+        // Matches facebook.com/page-name or facebook.com/profile.php?id=123
+        // Also handles links potentially inside 'links' array if we had it
+        // Basic extraction:
+        try {
+            const urlObj = new URL(url);
+            if (!urlObj.hostname.includes('facebook.com')) return null;
+
+            // Case 1: /profile.php?id=123
+            const idParam = urlObj.searchParams.get('id');
+            if (idParam) return idParam;
+
+            // Case 2: /page-name
+            // Pathname might be /page-name/ or /page-name
+            const pathParts = urlObj.pathname.split('/').filter(p => p);
+            if (pathParts.length > 0) {
+                // Avoid reserved paths like 'groups', 'events' if necessary, but usually index 0 is the handle
+                return pathParts[0];
+            }
+        } catch (e) {
+            return null;
+        }
+        return null;
+    };
+
+    const facebookUrl = website && getFacebookId(website) ? website : null;
+    // We could also check `links` array if it existed in data
+
+    const handleFacebookAnalysis = async () => {
+        if (!facebookUrl) return;
+
+        const profileId = getFacebookId(facebookUrl);
+        if (!profileId) {
+            setFacebookError("No se pudo obtener el ID de Facebook.");
+            return;
+        }
+
+        setLoadingFacebook(true);
+        setFacebookError(null);
+        setActiveTab('facebook');
+
+        try {
+            const response = await axios.post('/api/serpapi', {
+                engine: 'facebook_profile',
+                profile_id: profileId,
+                type: 'profile' // Just for clarity
+            });
+
+            if (response.data.error) {
+                throw new Error(response.data.error);
+            }
+
+            if (response.data.profile_results) {
+                setFacebookData(response.data.profile_results);
+            } else {
+                setFacebookError("No se encontraron datos del perfil.");
+            }
+        } catch (err: any) {
+            console.error("FB Analysis Error:", err);
+            setFacebookError(err.response?.data?.error || err.message || "Error analizando Facebook");
+        } finally {
+            setLoadingFacebook(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
             {/* Backdrop */}
@@ -68,6 +144,7 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
                         src={thumbnail || 'https://via.placeholder.com/800x400?text=No+Image'}
                         alt={title}
                         className="w-full h-full object-cover opacity-60"
+                        referrerPolicy="no-referrer"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0f111a] to-transparent" />
 
@@ -94,20 +171,28 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
                 </div>
 
                 {/* Tabs */}
-                <div className="flex bg-white/5 border-b border-white/5 px-6 shrink-0">
+                <div className="flex bg-white/5 border-b border-white/5 px-6 shrink-0 overflow-x-auto">
                     <button
                         onClick={() => setActiveTab('info')}
-                        className={cn("px-4 py-3 text-sm font-medium border-b-2 transition-colors", activeTab === 'info' ? "border-purple-500 text-purple-400" : "border-transparent text-gray-400 hover:text-white")}
+                        className={cn("px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap", activeTab === 'info' ? "border-purple-500 text-purple-400" : "border-transparent text-gray-400 hover:text-white")}
                     >
                         Información
                     </button>
                     <button
                         onClick={() => setActiveTab('reviews')}
-                        className={cn("px-4 py-3 text-sm font-medium border-b-2 transition-colors", activeTab === 'reviews' ? "border-purple-500 text-purple-400" : "border-transparent text-gray-400 hover:text-white")}
+                        className={cn("px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap", activeTab === 'reviews' ? "border-purple-500 text-purple-400" : "border-transparent text-gray-400 hover:text-white")}
                     >
                         Reseñas
                     </button>
-                    {/* Add more tabs if needed like Photos */}
+                    {(facebookUrl || facebookData) && (
+                        <button
+                            onClick={() => setActiveTab('facebook')}
+                            className={cn("px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap", activeTab === 'facebook' ? "border-blue-500 text-blue-400" : "border-transparent text-gray-400 hover:text-blue-200")}
+                        >
+                            <Facebook size={16} />
+                            Datos Facebook
+                        </button>
+                    )}
                 </div>
 
                 {/* Scrollable Content */}
@@ -135,29 +220,28 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
                                     </div>
                                 )}
                                 {website && (
-                                    <a href={website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-purple-300 hover:text-purple-200 transition-colors">
+                                    <a href={website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-purple-300 hover:text-purple-200 transition-colors break-all">
                                         <Globe size={20} className="text-purple-400 shrink-0" />
-                                        <span>Visitar Sitio Web</span>
+                                        <span>{website}</span>
                                     </a>
                                 )}
                                 {hours && (
                                     <div className="flex items-start gap-3 text-gray-300">
                                         <Clock size={20} className="text-purple-400 mt-0.5 shrink-0" />
-                                        <div className="text-sm space-y-1">
+                                        <div className="text-sm space-y-1 w-full">
                                             {/* Handle hours structure safely */}
                                             {Array.isArray(hours) ? hours.map((h: any, i: number) => (
                                                 <div key={i}>
                                                     {typeof h === 'string' ? h :
                                                         typeof h === 'object' && h !== null ?
-                                                            // Try to render object values or a safe property
                                                             Object.entries(h).map(([k, v]) => `${k}: ${v}`).join(', ')
                                                             : JSON.stringify(h)
                                                     }
                                                 </div>
                                             )) : typeof hours === 'object' && hours !== null ? Object.entries(hours).map(([day, hr]: [string, any]) => (
-                                                <div key={day}>
-                                                    <span className="capitalize w-24 inline-block">{day}:</span>
-                                                    {typeof hr === 'string' ? hr : Array.isArray(hr) ? hr.join(', ') : JSON.stringify(hr)}
+                                                <div key={day} className="flex justify-between">
+                                                    <span className="capitalize">{day}:</span>
+                                                    <span>{typeof hr === 'string' ? hr : Array.isArray(hr) ? hr.join(', ') : JSON.stringify(hr)}</span>
                                                 </div>
                                             )) : <span>Horarios disponibles en detalles completos</span>}
                                         </div>
@@ -175,8 +259,6 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
                                             let text = '';
                                             if (typeof ext === 'string') text = ext;
                                             else if (typeof ext === 'object' && ext !== null) {
-                                                // It usually has a key like 'accessibility' or similar
-                                                // We'll take the first value or join all values
                                                 text = Object.values(ext).join(': ');
                                             }
 
@@ -191,16 +273,120 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
                                     </div>
                                 )}
 
-                                <div className="mt-8 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
-                                    <h4 className="text-purple-300 font-medium mb-2 flex items-center gap-2">
-                                        <MessageSquare size={16} />
-                                        Análisis IA (Simulado)
-                                    </h4>
-                                    <p className="text-sm text-gray-400">
-                                        Este lugar tiene una alta tasa de satisfacción en servicio. Los clientes frecuentemente mencionan la calidad del ambiente.
-                                    </p>
-                                </div>
+                                {/* Facebook Promo Box */}
+                                {facebookUrl && !facebookData && (
+                                    <div className="mt-8 p-5 rounded-xl bg-blue-600/10 border border-blue-600/20">
+                                        <h4 className="text-blue-400 font-medium mb-2 flex items-center gap-2">
+                                            <Facebook size={18} />
+                                            Perfil de Facebook Detectado
+                                        </h4>
+                                        <p className="text-sm text-gray-400 mb-4">
+                                            Este negocio tiene presencia en Facebook. Analiza su perfil para obtener emails, seguidores y más datos de contacto.
+                                        </p>
+                                        <button
+                                            onClick={handleFacebookAnalysis}
+                                            disabled={loadingFacebook}
+                                            className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            {loadingFacebook ? (
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                            ) : (
+                                                <>
+                                                    <Users size={16} />
+                                                    Extraer Datos de Facebook
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {!facebookUrl && !loading && (
+                                    <div className="mt-8 p-4 rounded-xl bg-white/5 border border-white/10">
+                                        <p className="text-xs text-gray-500 text-center">
+                                            No se detectó enlace a Facebook en la información de Google Maps.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'facebook' && (
+                        <div className="space-y-6">
+                            {loadingFacebook && (
+                                <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mb-4"></div>
+                                    <p>Conectando con Facebook Graph...</p>
+                                </div>
+                            )}
+
+                            {facebookError && (
+                                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-center">
+                                    {facebookError}
+                                </div>
+                            )}
+
+                            {facebookData && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <img
+                                            src={facebookData.profile_picture || facebookData.cover_photo}
+                                            alt="Profile"
+                                            className="w-20 h-20 rounded-full border-2 border-blue-500 object-cover"
+                                            referrerPolicy="no-referrer"
+                                        />
+                                        <div>
+                                            <h3 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
+                                                {facebookData.name}
+                                                {facebookData.verified && <span className="text-blue-400" title="Verificado">✓</span>}
+                                            </h3>
+                                            <a href={facebookData.url} target="_blank" className="text-blue-400 hover:underline text-sm flex items-center gap-1">
+                                                {facebookData.url}
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                                        <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-center">
+                                            <div className="text-blue-400 mb-1 flex justify-center"><Users size={20} /></div>
+                                            <div className="text-xl font-bold text-white">{facebookData.followers || 'N/A'}</div>
+                                            <div className="text-xs text-gray-400">Seguidores</div>
+                                        </div>
+                                        <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-center">
+                                            <div className="text-blue-400 mb-1 flex justify-center"><ThumbsUp size={20} /></div>
+                                            <div className="text-xl font-bold text-white">{facebookData.likes || 'N/A'}</div>
+                                            <div className="text-xs text-gray-400">Likes</div>
+                                        </div>
+                                        <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-center">
+                                            <div className="text-blue-400 mb-1 flex justify-center"><Mail size={20} /></div>
+                                            <div className="text-sm font-bold text-white break-all">{facebookData.email || 'No público'}</div>
+                                            <div className="text-xs text-gray-400">Email</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white/5 p-6 rounded-2xl border border-white/10 space-y-4">
+                                        <h4 className="font-semibold text-white">Detalles del Perfil</h4>
+
+                                        {facebookData.phone && (
+                                            <div className="flex items-center gap-3 text-gray-300">
+                                                <Phone size={18} className="text-blue-500" />
+                                                <span>{facebookData.phone}</span>
+                                            </div>
+                                        )}
+                                        {facebookData.category && (
+                                            <div className="flex items-center gap-3 text-gray-300">
+                                                <span className="text-blue-500 font-bold text-sm bg-blue-500/10 px-2 py-0.5 rounded">CAT</span>
+                                                <span>{facebookData.category}</span>
+                                            </div>
+                                        )}
+                                        {facebookData.profile_intro_text && (
+                                            <div className="p-4 bg-black/20 rounded-xl text-gray-400 italic text-sm border-l-2 border-blue-500">
+                                                "{facebookData.profile_intro_text}"
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
