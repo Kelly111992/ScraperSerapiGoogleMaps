@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import axios from 'axios';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { MapPin, Zap, Download, CheckSquare, Square } from 'lucide-react';
+import { MapPin, Zap, Download, CheckSquare, Square, ThumbsUp, Star } from 'lucide-react';
 import jsPDF from 'jspdf';
 import SearchBar from './components/SearchBar';
 import PlaceGrid from './components/PlaceGrid';
 import PlaceDetailsModal from './components/PlaceDetailsModal';
+import { calculateClaveScore } from '../utils/score';
 
 export function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -33,6 +34,24 @@ export default function Home() {
 
   // Selection & Export State
   const [selectedPlaceIds, setSelectedPlaceIds] = useState<Set<string>>(new Set());
+
+  // Sorting State
+  const [sortBy, setSortBy] = useState<'relevance' | 'score'>('score');
+
+  // Process and sort results
+  const displayedResults = useMemo(() => {
+    // Add score to each result
+    const scored = results.map(place => ({
+      ...place,
+      score: calculateClaveScore(place)
+    }));
+
+    if (sortBy === 'score') {
+      return [...scored].sort((a, b) => b.score.total - a.score.total);
+    }
+
+    return scored;
+  }, [results, sortBy]);
 
   const handleSearch = async (query: string, location: string) => {
     setLoading(true);
@@ -139,8 +158,21 @@ export default function Home() {
     }
   };
 
-  const handleSelectPlace = (placeId: string) => {
-    const placeData = results.find(r => r.place_id === placeId || r.place_id_search === placeId);
+  const handleSelectPlace = (place: any) => {
+    // If passed an ID string (legacy safety), find it. If passed object, use it.
+    let placeData = place;
+    let placeId = place.place_id || place.place_id_search;
+
+    if (typeof place === 'string') {
+      placeId = place;
+      placeData = results.find(r => r.place_id === placeId || r.place_id_search === placeId);
+    }
+
+    // Ensure we have a valid ID
+    if (!placeId && placeData) {
+      placeId = placeData.place_id || placeData.place_id_search;
+    }
+
     setSelectedPlaceId(placeId);
     setSelectedPlaceInitialData(placeData);
     setIsModalOpen(true);
@@ -314,6 +346,31 @@ export default function Home() {
             <div className="mb-6 flex flex-col sm:flex-row justify-between items-center px-6 gap-4">
               <div className="flex items-center gap-4">
                 <h2 className="text-2xl font-bold text-white">Resultados ({results.length})</h2>
+
+                {/* Sorting Links */}
+                <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+                  <button
+                    onClick={() => setSortBy('relevance')}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
+                      sortBy === 'relevance' ? "bg-white/10 text-white shadow-sm" : "text-gray-400 hover:text-white"
+                    )}
+                  >
+                    <MapPin size={12} />
+                    Relevancia
+                  </button>
+                  <button
+                    onClick={() => setSortBy('score')}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
+                      sortBy === 'score' ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-sm" : "text-gray-400 hover:text-white"
+                    )}
+                  >
+                    <Star size={12} />
+                    Clave Score
+                  </button>
+                </div>
+
                 {/* Select All Button */}
                 <button
                   onClick={toggleSelectAll}
@@ -331,7 +388,7 @@ export default function Home() {
           )}
 
           <PlaceGrid
-            places={results}
+            places={displayedResults}
             onSelectPlace={handleSelectPlace}
             isLoading={loading}
             selectedIds={selectedPlaceIds}

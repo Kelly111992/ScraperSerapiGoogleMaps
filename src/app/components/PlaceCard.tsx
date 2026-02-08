@@ -4,22 +4,13 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 interface PlaceCardProps {
-    place: {
-        title: string;
-        thumbnail?: string;
-        rating?: number;
-        reviews?: number;
-        address?: string;
-        place_id?: string;
-        place_id_search?: string;
-        gps_coordinates?: {
-            latitude: number;
-            longitude: number;
-        };
-    };
-    onSelect: (placeId: string) => void; // Open details
+    place: any;
+    onSelect: (place: any) => void;
+    // Selection props
+    selectable?: boolean;
     isSelected?: boolean;
-    onToggleSelect?: (placeId: string) => void; // Toggle selection for export
+    onToggleSelect?: (id: string) => void;
+    score?: { total: number, tier: string }; // New prop
     className?: string;
 }
 
@@ -27,36 +18,57 @@ export function cn(...inputs: (string | undefined | null | false)[]) {
     return twMerge(clsx(inputs));
 }
 
-const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, isSelected, onToggleSelect, className }) => {
-    const { title, thumbnail, rating, reviews, address, place_id, place_id_search } = place;
+const PlaceCard: React.FC<PlaceCardProps> = ({
+    place,
+    onSelect,
+    selectable = false,
+    isSelected = false,
+    onToggleSelect,
+    score,
+    className
+}) => {
+    const { title, thumbnail, rating, reviews, address, place_id, place_id_search, open_state, phone, website } = place;
     const idToUse = place_id || place_id_search;
 
     return (
         <div
             className={cn(
-                "group relative bg-white/5 backdrop-blur-sm border rounded-2xl overflow-hidden hover:bg-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 cursor-pointer flex flex-col h-full",
-                isSelected ? "border-purple-500 ring-1 ring-purple-500 bg-purple-500/10" : "border-white/10",
+                "group relative bg-[#0f111a] rounded-2xl overflow-hidden border transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 flex flex-col h-full",
+                isSelected ? "border-purple-500 ring-1 ring-purple-500" : "border-white/5 hover:border-purple-500/50",
                 className
             )}
-            onClick={() => idToUse && onSelect(idToUse)}
+            onClick={() => onSelect(place)}
         >
-            {/* Selection Checkbox */}
-            {onToggleSelect && idToUse && (
-                <div
-                    className="absolute top-3 left-3 z-20"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleSelect(idToUse);
-                    }}
-                >
-                    <div className={cn(
-                        "w-6 h-6 rounded-lg border flex items-center justify-center transition-all shadow-md",
-                        isSelected
-                            ? "bg-purple-500 border-purple-500 text-white"
-                            : "bg-black/40 border-white/30 text-transparent hover:border-white/60"
-                    )}>
+            {/* Selection Checkbox Overlay */}
+            {selectable && (
+                <div className="absolute top-3 left-3 z-20">
+                    <div
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleSelect?.(place.place_id);
+                        }}
+                        className={cn(
+                            "w-6 h-6 rounded-md border flex items-center justify-center cursor-pointer transition-colors backdrop-blur-sm",
+                            isSelected
+                                ? "bg-purple-600 border-purple-600 text-white"
+                                : "bg-black/40 border-white/30 hover:bg-black/60 text-transparent"
+                        )}
+                    >
                         <Check size={14} strokeWidth={3} />
                     </div>
+                </div>
+            )}
+
+            {/* Score Badge */}
+            {score && (
+                <div className={cn(
+                    "absolute top-3 right-3 z-20 px-2 py-1 rounded-lg text-xs font-bold backdrop-blur-md border shadow-lg",
+                    score.tier === 'Premium' ? "bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black border-amber-300/50" :
+                        score.tier === 'High' ? "bg-green-500/90 text-white border-green-400/30" :
+                            score.tier === 'Medium' ? "bg-blue-500/90 text-white border-blue-400/30" :
+                                "bg-gray-600/90 text-gray-200 border-gray-500/30"
+                )}>
+                    {score.total} <span className="text-[10px] opacity-80 uppercase tracking-wider ml-0.5">{score.tier}</span>
                 </div>
             )}
 

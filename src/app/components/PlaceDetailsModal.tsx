@@ -3,6 +3,8 @@ import { X, Star, MapPin, Phone, Globe, Clock, ChevronRight, MessageSquare, Face
 import axios from 'axios';
 import { cn } from './PlaceCard';
 
+import ReviewsList from './ReviewsList';
+
 interface PlaceDetailsModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -23,6 +25,11 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'info' | 'reviews' | 'photos' | 'facebook'>('info');
 
+    // Reviews State
+    const [reviewsData, setReviewsData] = useState<any[]>([]);
+    const [loadingReviews, setLoadingReviews] = useState(false);
+    const [reviewsError, setReviewsError] = useState<string | null>(null);
+
     // Facebook Integration State
     const [facebookData, setFacebookData] = useState<any>(null);
     const [loadingFacebook, setLoadingFacebook] = useState(false);
@@ -35,6 +42,8 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
             setDetails(initialData || null); // Show what we have first
             setFacebookData(null); // Reset FB data
             setFacebookError(null);
+            setReviewsData([]); // Reset reviews
+            setReviewsError(null);
             setActiveTab('info');
 
             fetchDetails(placeId)
@@ -53,6 +62,36 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
             setDetails(null);
         }
     }, [isOpen, placeId, fetchDetails, initialData]);
+
+    // Data-Id is needed for Reviews API. Usually available in place details or we use place_id if supported.
+    // SerpApi google_maps_reviews uses 'data_id' or 'place_id'.
+    // If 'placeId' passed to modal is a place_id_search (cid), we might need the hex data_id.
+    // However, usually place_id works or we have data_id in the details.
+
+    useEffect(() => {
+        if (activeTab === 'reviews' && reviewsData.length === 0 && !loadingReviews && !reviewsError) {
+            const fetchDataIds = details?.place_id || details?.data_id || placeId;
+
+            if (fetchDataIds) {
+                setLoadingReviews(true);
+                axios.post('/api/serpapi', {
+                    engine: 'google_maps_reviews',
+                    place_id: fetchDataIds, // Try place_id first
+                    hl: 'es' // Spanish reviews
+                })
+                    .then(res => {
+                        if (res.data.error) throw new Error(res.data.error);
+                        setReviewsData(res.data.reviews || []);
+                    })
+                    .catch(err => {
+                        console.error("Error fetching reviews:", err);
+                        setReviewsError("Error cargando reseñas.");
+                    })
+                    .finally(() => setLoadingReviews(false));
+            }
+        }
+    }, [activeTab, details, placeId, reviewsData.length, loadingReviews, reviewsError]);
+
 
     if (!isOpen) return null;
 
@@ -183,6 +222,7 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
                         className={cn("px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap", activeTab === 'reviews' ? "border-purple-500 text-purple-400" : "border-transparent text-gray-400 hover:text-white")}
                     >
                         Reseñas
+                        {reviewsData.length > 0 && <span className="ml-2 px-1.5 py-0.5 bg-white/10 rounded-full text-xs">{reviewsData.length}</span>}
                     </button>
                     {(facebookUrl || facebookData) && (
                         <button
@@ -392,10 +432,13 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
 
                     {activeTab === 'reviews' && (
                         <div className="space-y-6">
-                            {/* Placeholder for reviews list - needs real data structure */}
-                            <div className="text-gray-400 text-center py-10">
-                                {loading ? 'Cargando reseñas...' : 'Explora las reseñas detalladas en la versión completa.'}
-                            </div>
+                            {reviewsError && (
+                                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-center">
+                                    {reviewsError}
+                                </div>
+                            )}
+
+                            <ReviewsList reviews={reviewsData} isLoading={loadingReviews} />
                         </div>
                     )}
                 </div>

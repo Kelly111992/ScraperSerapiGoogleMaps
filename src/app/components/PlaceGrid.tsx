@@ -3,7 +3,7 @@ import PlaceCard from './PlaceCard';
 
 interface PlaceGridProps {
     places: any[];
-    onSelectPlace: (placeId: string) => void;
+    onSelectPlace: (place: any) => void;
     isLoading?: boolean;
     selectedIds: Set<string>;
     onToggleSelect: (placeId: string) => void;
@@ -35,6 +35,8 @@ const PlaceGrid: React.FC<PlaceGridProps> = ({ places, onSelectPlace, isLoading,
                         onSelect={onSelectPlace}
                         isSelected={id ? selectedIds.has(id) : false}
                         onToggleSelect={onToggleSelect}
+                        score={place.score}
+                        selectable={true}
                     />
                 );
             })}
