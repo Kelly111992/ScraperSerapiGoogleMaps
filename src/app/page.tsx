@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import axios from 'axios';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { MapPin, Zap, Download, CheckSquare, Square, ThumbsUp, Star } from 'lucide-react';
+import { MapPin, Zap, Download, CheckSquare, Square, ThumbsUp, Star, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import SearchBar from './components/SearchBar';
 import PlaceGrid from './components/PlaceGrid';
@@ -46,9 +46,9 @@ export default function Home() {
   // Niche State (for local relevance filtering)
   const [selectedNicheId, setSelectedNicheId] = useState<string>('');
 
-  // AI Analysis State
   const [aiVerdicts, setAiVerdicts] = useState<Record<string, { verdict: string; reason: string }>>({});
   const [analyzing, setAnalyzing] = useState(false);
+  const [enrichingCount, setEnrichingCount] = useState(0);
 
   // Get active niche for filtering
   const activeNiche = oregonNiches.find(n => n.id === selectedNicheId);
@@ -89,8 +89,29 @@ export default function Home() {
           keywords: niche.keywords
         }
       });
-      if (res.data.results) {
-        setAiVerdicts(prev => ({ ...prev, ...res.data.results }));
+
+      const verdicts = res.data.results || {};
+      if (verdicts) {
+        setAiVerdicts(prev => ({ ...prev, ...verdicts }));
+
+        // --- AUTO-ENRICH TOP PROSPECTS ---
+        const validProspects = businesses.filter(b => {
+          const id = (b.place_id || b.place_id_search || '') as string;
+          return id && verdicts[id]?.verdict !== 'irrelevant';
+        });
+
+        // Enrich the top 12 prospects automatically
+        setEnrichingCount(Math.min(validProspects.length, 12));
+        for (const prospect of validProspects.slice(0, 12)) {
+          try {
+            await handleEnrichPlace(prospect);
+          } catch (e) {
+            console.error("Auto-enrich error for", prospect.title, e);
+          } finally {
+            setEnrichingCount(prev => Math.max(0, prev - 1));
+          }
+        }
+        setEnrichingCount(0);
       }
     } catch (err) {
       console.error('AI analysis error:', err);
@@ -158,22 +179,23 @@ export default function Home() {
 
     if (activeNiche) {
       const order: Record<string, number> = { relevant: 0, neutral: 1, discard: 2 };
-      return [...scored].sort((a, b) => {
-        // Prioritize Premium/Enriched results first within the same Relevance group
-        if (a.nicheMatch?.status === b.nicheMatch?.status) {
-          const aPremium = a.enrichedData ? 1 : 0;
-          const bPremium = b.enrichedData ? 1 : 0;
-          if (aPremium !== bPremium) return bPremium - aPremium;
 
-          const aScore = a.enrichedData?.premiumScore || a.nicheMatch?.score || 0;
-          const bScore = b.enrichedData?.premiumScore || b.nicheMatch?.score || 0;
-          return bScore - aScore;
-        }
+      return [...scored]
+        .filter(p => p.nicheMatch?.status !== 'discard') // OCULTAR DESCARTADOS
+        .sort((a, b) => {
+          // 1. Prioridad: Priority Score (Enriquecidos)
+          const pScoreA = a.enrichedData?.premiumScore || 0;
+          const pScoreB = b.enrichedData?.premiumScore || 0;
+          if (pScoreA !== pScoreB) return pScoreB - pScoreA;
 
-        const aOrder = a.nicheMatch ? (order[a.nicheMatch.status] ?? 1) : 1;
-        const bOrder = b.nicheMatch ? (order[b.nicheMatch.status] ?? 1) : 1;
-        return aOrder - bOrder;
-      });
+          // 2. Relevancia de Nicho
+          const statusA = a.nicheMatch?.status || 'neutral';
+          const statusB = b.nicheMatch?.status || 'neutral';
+          if (statusA !== statusB) return order[statusA] - order[statusB];
+
+          // 3. Score Básico
+          return b.score.total - a.score.total;
+        });
     }
 
     return scored;
@@ -477,9 +499,14 @@ export default function Home() {
           {!loading && results.length > 0 && (
             <div className="mb-6 flex flex-col sm:flex-row justify-between items-center px-6 gap-4">
               <div className="flex items-center gap-4">
-                <h2 className="text-2xl font-bold text-white">Resultados ({results.length})</h2>
+                <h2 className="text-2xl font-bold text-white tracking-tight">Oportunidades MARVELSA ({displayedResults.length})</h2>
 
-                {/* Sorting Links */}
+                {enrichingCount > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-black text-cyan-400 animate-pulse uppercase tracking-widest">
+                    <Loader2 size={12} className="animate-spin" />
+                    Enriqueciendo {enrichingCount} prospectos...
+                  </div>
+                )}
                 <div className="flex bg-white/5 rounded-lg p-1 border border-white/10 opacity-50 cursor-not-allowed hidden">
                   {/* Sorting controls removed as requested */}
                 </div>
