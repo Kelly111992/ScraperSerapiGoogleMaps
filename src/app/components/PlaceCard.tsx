@@ -1,16 +1,24 @@
 import React from 'react';
-import { Star, MapPin, Navigation, Check } from 'lucide-react';
+import { Star, MapPin, Navigation, Check, ShieldCheck, ShieldAlert, ShieldX } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+
+interface NicheMatch {
+    status: 'relevant' | 'neutral' | 'discard';
+    confidence: number;
+    reason: string;
+    matchedKeywords: string[];
+    matchedNegatives: string[];
+}
 
 interface PlaceCardProps {
     place: any;
     onSelect: (place: any) => void;
-    // Selection props
     selectable?: boolean;
     isSelected?: boolean;
     onToggleSelect?: (id: string) => void;
-    score?: { total: number, tier: string }; // New prop
+    score?: { total: number, tier: string };
+    nicheMatch?: NicheMatch;
     className?: string;
 }
 
@@ -25,16 +33,20 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
     isSelected = false,
     onToggleSelect,
     score,
+    nicheMatch,
     className
 }) => {
     const { title, thumbnail, rating, reviews, address, place_id, place_id_search, open_state, phone, website } = place;
     const idToUse = place_id || place_id_search;
+
+    const isDiscard = nicheMatch?.status === 'discard';
 
     return (
         <div
             className={cn(
                 "group relative bg-[#0f111a] rounded-2xl overflow-hidden border transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 flex flex-col h-full",
                 isSelected ? "border-purple-500 ring-1 ring-purple-500" : "border-white/5 hover:border-purple-500/50",
+                isDiscard && "opacity-50 hover:opacity-80",
                 className
             )}
             onClick={() => onSelect(place)}
@@ -109,15 +121,30 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                         {title}
                     </h3>
                     {address && (
-                        <div className="flex items-start gap-2 text-gray-400 text-sm mb-4">
+                        <div className="flex items-start gap-2 text-gray-400 text-sm mb-3">
                             <MapPin size={16} className="mt-1 flex-shrink-0 text-purple-400" />
                             <p className="line-clamp-2">{address}</p>
                         </div>
                     )}
                 </div>
 
+                {/* Niche Match Badge */}
+                {nicheMatch && (
+                    <div className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium mb-3 border",
+                        nicheMatch.status === 'relevant' && "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                        nicheMatch.status === 'neutral' && "bg-amber-500/10 text-amber-400 border-amber-500/20",
+                        nicheMatch.status === 'discard' && "bg-red-500/10 text-red-400 border-red-500/20"
+                    )}>
+                        {nicheMatch.status === 'relevant' && <ShieldCheck size={14} />}
+                        {nicheMatch.status === 'neutral' && <ShieldAlert size={14} />}
+                        {nicheMatch.status === 'discard' && <ShieldX size={14} />}
+                        <span className="truncate">{nicheMatch.reason}</span>
+                    </div>
+                )}
+
                 <button
-                    className="w-full mt-4 py-2 px-4 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600 hover:text-white transition-all duration-300 font-medium flex items-center justify-center gap-2 group-hover:border-purple-500"
+                    className="w-full mt-auto py-2 px-4 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600 hover:text-white transition-all duration-300 font-medium flex items-center justify-center gap-2 group-hover:border-purple-500"
                 >
                     <Navigation size={16} />
                     Ver Detalles

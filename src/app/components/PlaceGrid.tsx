@@ -36,6 +36,7 @@ const PlaceGrid: React.FC<PlaceGridProps> = ({ places, onSelectPlace, isLoading,
                         isSelected={id ? selectedIds.has(id) : false}
                         onToggleSelect={onToggleSelect}
                         score={place.score}
+                        nicheMatch={place.nicheMatch}
                         selectable={true}
                     />
                 );

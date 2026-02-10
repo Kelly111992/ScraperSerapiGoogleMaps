@@ -7,9 +7,10 @@ import { cn } from '@/lib/utils';
 interface SearchBarProps {
     onSearch: (query: string, location: string) => void;
     isLoading: boolean;
+    onNicheChange?: (nicheId: string) => void;
 }
 
-const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading }) => {
+const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading, onNicheChange }) => {
     // Mode State
     const [searchMode, setSearchMode] = useState<'free' | 'strategic'>('free');
 
@@ -123,6 +124,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading }) => {
                                     onChange={(e) => {
                                         setSelectedNicheId(e.target.value);
                                         setSelectedKeyword(''); // Reset keyword
+                                        onNicheChange?.(e.target.value);
                                     }}
                                     className="w-full h-10 pl-10 pr-4 bg-white/5 border border-white/5 rounded-xl text-white outline-none focus:bg-white/10 focus:border-emerald-500/30 appearance-none cursor-pointer transition-all text-sm font-medium"
                                 >

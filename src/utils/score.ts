@@ -56,3 +56,88 @@ export function calculateClaveScore(place: any): ScoreBreakdown {
         tier
     };
 }
+
+// --- Niche Relevance Match ---
+
+export interface NicheMatchResult {
+    status: 'relevant' | 'neutral' | 'discard';
+    confidence: number; // 0-100
+    reason: string;
+    matchedKeywords: string[];
+    matchedNegatives: string[];
+}
+
+export function calculateNicheMatch(
+    place: any,
+    nicheKeywords: string[],
+    negativeKeywords: string[]
+): NicheMatchResult {
+    // Text to analyze (lowercase for comparison)
+    const title = (place.title || '').toLowerCase();
+    const type = (place.type || '').toLowerCase();
+    const address = (place.address || '').toLowerCase();
+    const description = (place.description || '').toLowerCase();
+    const combined = `${title} ${type} ${address} ${description}`;
+
+    const matchedKeywords: string[] = [];
+    const matchedNegatives: string[] = [];
+
+    // Check positive keywords (split into individual words for partial matching)
+    for (const kw of nicheKeywords) {
+        const kwWords = kw.toLowerCase().split(/\s+/);
+        // A keyword matches if at least 2 of its words appear (or all if keyword is 1-2 words)
+        const minWordsToMatch = Math.min(kwWords.length, 2);
+        const wordsFound = kwWords.filter(w => w.length > 3 && combined.includes(w));
+        if (wordsFound.length >= minWordsToMatch) {
+            matchedKeywords.push(kw);
+        }
+    }
+
+    // Check negative keywords
+    for (const neg of negativeKeywords) {
+        if (combined.includes(neg.toLowerCase())) {
+            matchedNegatives.push(neg);
+        }
+    }
+
+    // Decision logic
+    if (matchedNegatives.length > 0 && matchedKeywords.length === 0) {
+        return {
+            status: 'discard',
+            confidence: Math.min(90, 60 + matchedNegatives.length * 15),
+            reason: `Contiene: ${matchedNegatives.join(', ')}`,
+            matchedKeywords,
+            matchedNegatives
+        };
+    }
+
+    if (matchedKeywords.length > 0 && matchedNegatives.length === 0) {
+        return {
+            status: 'relevant',
+            confidence: Math.min(95, 50 + matchedKeywords.length * 20),
+            reason: `Coincide con: ${matchedKeywords.slice(0, 2).join(', ')}`,
+            matchedKeywords,
+            matchedNegatives
+        };
+    }
+
+    if (matchedKeywords.length > 0 && matchedNegatives.length > 0) {
+        // Mixed signals
+        return {
+            status: matchedKeywords.length >= matchedNegatives.length ? 'neutral' : 'discard',
+            confidence: 40,
+            reason: `Señales mixtas: +${matchedKeywords.length} / -${matchedNegatives.length}`,
+            matchedKeywords,
+            matchedNegatives
+        };
+    }
+
+    // No matches at all — neutral
+    return {
+        status: 'neutral',
+        confidence: 20,
+        reason: 'Sin coincidencias claras',
+        matchedKeywords,
+        matchedNegatives
+    };
+}

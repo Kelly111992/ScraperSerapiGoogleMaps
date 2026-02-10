@@ -9,7 +9,8 @@ import jsPDF from 'jspdf';
 import SearchBar from './components/SearchBar';
 import PlaceGrid from './components/PlaceGrid';
 import PlaceDetailsModal from './components/PlaceDetailsModal';
-import { calculateClaveScore } from '../utils/score';
+import { calculateClaveScore, calculateNicheMatch } from '../utils/score';
+import { oregonNiches } from '../data/oregonNiches';
 
 export function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -38,20 +39,40 @@ export default function Home() {
   // Sorting State
   const [sortBy, setSortBy] = useState<'relevance' | 'score'>('relevance');
 
-  // Process and sort results
-  const displayedResults = useMemo(() => {
-    // Add score to each result
-    const scored = results.map(place => ({
-      ...place,
-      score: calculateClaveScore(place)
-    }));
+  // Niche State (for local relevance filtering)
+  const [selectedNicheId, setSelectedNicheId] = useState<string>('');
 
+  // Get active niche for filtering
+  const activeNiche = oregonNiches.find(n => n.id === selectedNicheId);
+
+  // Process and sort results (with niche match if active)
+  const displayedResults = useMemo(() => {
+    // Add score + niche match to each result
+    const scored = results.map(place => {
+      const score = calculateClaveScore(place);
+      const nicheMatch = activeNiche
+        ? calculateNicheMatch(place, activeNiche.keywords, activeNiche.negativeKeywords)
+        : undefined;
+      return { ...place, score, nicheMatch };
+    });
+
+    // Sort: by score, or by relevance (niche discards go to bottom)
     if (sortBy === 'score') {
       return [...scored].sort((a, b) => b.score.total - a.score.total);
     }
 
+    // If niche is active, sort: relevant first, neutral middle, discard last
+    if (activeNiche) {
+      const order: Record<string, number> = { relevant: 0, neutral: 1, discard: 2 };
+      return [...scored].sort((a, b) => {
+        const aOrder = a.nicheMatch ? (order[a.nicheMatch.status] ?? 1) : 1;
+        const bOrder = b.nicheMatch ? (order[b.nicheMatch.status] ?? 1) : 1;
+        return aOrder - bOrder;
+      });
+    }
+
     return scored;
-  }, [results, sortBy]);
+  }, [results, sortBy, activeNiche]);
 
   const handleSearch = async (query: string, location: string) => {
     setLoading(true);
@@ -330,7 +351,7 @@ export default function Home() {
           </p>
 
           <div className="w-full">
-            <SearchBar onSearch={handleSearch} isLoading={loading} />
+            <SearchBar onSearch={handleSearch} isLoading={loading} onNicheChange={setSelectedNicheId} />
           </div>
         </header>
 
