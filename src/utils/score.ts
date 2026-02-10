@@ -147,18 +147,37 @@ export function calculateNicheMatch(
         }
     }
 
-    // Check negative keywords (full phrase match in all text)
+    // GLOBAL NEGATIVES: Forcing discard on domestic appliances for all machinery niches
+    const GLOBAL_NEGATIVES = ['batidora', 'licuadora', 'cocina', 'hogar', 'microondas', 'aspiradora', 'lavadora', 'refrigerador', 'plancha', 'electrodomesticos'];
+
+    // Check local negative keywords AND Global ones
     const allText = `${title} ${type} ${description} ${address}`;
     const matchedNegatives: string[] = [];
+
+    // Check niche-specific negatives
     for (const neg of negativeKeywords) {
         if (allText.includes(neg.toLowerCase())) {
             matchedNegatives.push(neg);
         }
     }
 
+    // Check global negatives (high impact)
+    for (const glob of GLOBAL_NEGATIVES) {
+        // If it's in the TITLE, it's an immediate red flag
+        const inTitle = title.includes(glob);
+        const inGeneral = allText.includes(glob);
+
+        if (inTitle) {
+            matchedNegatives.push(glob);
+            weightedScore = -50; // Force immediate discard if in title
+        } else if (inGeneral) {
+            matchedNegatives.push(glob);
+            weightedScore -= 10;
+        }
+    }
+
     // Penalty for negatives
-    const negPenalty = matchedNegatives.length * 5;
-    const finalScore = Math.max(0, weightedScore - negPenalty);
+    const finalScore = Math.max(-100, weightedScore);
 
     // Decision thresholds
     // Score >= 3 = relevant (e.g., "motosierras" in title = freq(3) * title(3) = 9)
