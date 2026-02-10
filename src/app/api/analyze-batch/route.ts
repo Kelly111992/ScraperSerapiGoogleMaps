@@ -29,15 +29,21 @@ export async function POST(request: Request) {
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-        const prompt = `Eres un clasificador experto de leads B2B de ALTA PRECISIÓN. Tu trabajo es filtrar una lista de negocios y determinar quiénes son realmente clientes potenciales para un producto de nivel industrial/profesional.
+        const prompt = `Eres el Clasificador Estratégico de MARVELSA (Comercializadora Marvel). Tu misión es identificar prospectos que encajen estrictamente con nuestra razón de ser: la comercialización de equipos para la industria AGRÍCOLA, FORESTAL, JARDINERÍA y CONSTRUCCIÓN.
 
-## REGLA DE ORO:
-- Si el negocio es DOMÉSTICO o de LÍNEA BLANCA (reparación de batidoras, licuadoras, lavadoras, planchas) y el nicho pide maquinaria o herramientas, clasifícalo como "irrelevant". NO queremos talleres de cocina/hogar.
+## TU "RAZÓN DE SER" (MARVELSA):
+Solo buscamos negocios que vendan, reparen o utilicen maquinaria de estos 4 sectores:
+1. **Agrícola/Forestal** (Tractores, motosierras, sistemas de riego, etc.).
+2. **Jardinería Profesional** (Podadoras, desbrozadoras de mano, etc.).
+3. **Construcción** (Maquinaria pesada, herramientas neumáticas, compresores, generadores).
 
-## NICHO TARGET:
+## REGLA DE EXCLUSIÓN ABSOLUTA:
+- **DESCARTA PERENTORIAMENTE** cualquier negocio de **HOGAR / LÍNEA BLANCA / COCINA**. 
+- Si el negocio dice "Batidoras", "Licuadoras", "Cafeteras", "Estufas" o "Microondas", es IRRELEVANT. Aunque digan "Refacciones", si son refacciones de cocina, NO SON MARVELSA.
+
+## NICHO ACTUAL DE BÚSQUEDA:
 - Nombre: ${niche.name}
 - Descripción: ${niche.description}
-- Palabras Clave: ${niche.keywords?.join(', ')}
 
 ## NEGOCIOS A CLASIFICAR:
 ${businessList.map((b: any) => `[${b.idx}] "${b.name}" | Tipo: ${b.type} | Dir: ${b.address}`).join('\n')}

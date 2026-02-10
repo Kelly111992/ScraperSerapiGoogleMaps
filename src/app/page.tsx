@@ -450,15 +450,15 @@ export default function Home() {
               <Zap className="text-white fill-white" size={32} />
             </div>
             <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400 tracking-tight">
-              Buscador<span className="text-purple-500">Pro</span>
+              MARVELSA<span className="text-purple-500 italic">PRO</span>
             </h1>
           </div>
 
           <p className={cn(
-            "text-gray-400 text-center max-w-md mb-10 transition-all duration-500",
+            "text-gray-400 text-center max-w-lg mb-10 transition-all duration-500 leading-relaxed",
             results.length > 0 ? "hidden" : "block"
           )}>
-            Descubre lugares increíbles con tecnología de búsqueda visual inteligente. Encuentra, analiza y exporta.
+            Generando bienestar a través del filtrado inteligente de prospectos para la industria <span className="text-gray-200">Agrícola</span>, <span className="text-gray-200">Forestal</span>, <span className="text-gray-200">Jardinería</span> y <span className="text-gray-200">Construcción</span>.
           </p>
 
           <div className="w-full">
