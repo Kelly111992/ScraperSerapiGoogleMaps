@@ -29,30 +29,26 @@ export async function POST(request: Request) {
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-        const prompt = `Eres un clasificador de prospectos comerciales. Tu trabajo es determinar si cada negocio de la lista es un PROSPECTO REAL para el nicho target.
+        const prompt = `Eres un clasificador experto de leads B2B de ALTA PRECISIÓN. Tu trabajo es filtrar una lista de negocios y determinar quiénes son realmente clientes potenciales para un producto de nivel industrial/profesional.
+
+## REGLA DE ORO:
+- Si el negocio es DOMÉSTICO o de LÍNEA BLANCA (reparación de batidoras, licuadoras, lavadoras, planchas) y el nicho pide maquinaria o herramientas, clasifícalo como "irrelevant". NO queremos talleres de cocina/hogar.
 
 ## NICHO TARGET:
 - Nombre: ${niche.name}
 - Descripción: ${niche.description}
-- Keywords relevantes: ${niche.keywords?.slice(0, 5).join(', ')}
+- Palabras Clave: ${niche.keywords?.join(', ')}
 
 ## NEGOCIOS A CLASIFICAR:
 ${businessList.map((b: any) => `[${b.idx}] "${b.name}" | Tipo: ${b.type} | Dir: ${b.address}`).join('\n')}
 
-## INSTRUCCIONES:
-Para CADA negocio, clasifica como:
-- "prospect" = Es o PODRÍA SER cliente del nicho (vende, repara o usa productos/servicios del nicho)
-- "irrelevant" = NO tiene relación con el nicho (ej: batidoras en un nicho de motosierras, restaurantes, hoteles)
-- "uncertain" = No hay suficiente info para decidir
+## CLASIFICACIÓN:
+1. "prospect": Vende/repara herramientas eléctricas industriales, maquinaria pesada, equipo forestal o agrícola de marca profesional (STIHL, DeWalt, Makita, Cat, etc.).
+2. "irrelevant": Es de otro rubro (comida, salud, hogar, ELECTRODOMÉSTICOS PEQUEÑOS de cocina) o no tiene nada que ver.
+3. "uncertain": Una ferretería generalista donde hay duda de si venden marcas PRO.
 
-## CRITERIOS IMPORTANTES:
-- Un taller de reparación es prospect si repara equipos del nicho
-- Una ferretería general es "uncertain" (podrían vender productos del nicho)
-- Un negocio de otro rubro (cocina, deportes, salud) es "irrelevant"
-- El nombre del negocio es la pista más fuerte
-
-Responde SOLO con un JSON array válido, sin markdown, sin explicaciones:
-[{"idx":0,"verdict":"prospect","reason":"breve razón"},{"idx":1,"verdict":"irrelevant","reason":"breve razón"}]`;
+Responde SOLO un JSON array:
+[{"idx":0,"verdict":"prospect","reason":"Es un distribuidor oficial de equipo forestal"},{"idx":1,"verdict":"irrelevant","reason":"Es reparación de electrodomésticos domésticos, no industrial"}]`;
 
         const result = await model.generateContent(prompt);
         const text = result.response.text().trim();

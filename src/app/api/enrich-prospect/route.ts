@@ -17,112 +17,82 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Datos de lugar inválidos' }, { status: 400 });
         }
 
-        // 1. Google Maps Reviews Analysis (Activity & Life)
-        // Usamos el data_id si existe, o buscamos por "Reviews de [Negocio]"
-        let reviewsData: any = {};
-        if (place.data_id) {
-            try {
-                // Nota: Esta llamada consume créditos de SerpApi. Solo usar en click de usuario.
-                // Para demo/ahorro, podemos simular o limitar.
-                // Implementación real:
-                /*
-               const reviewsResponse = await getJson({
-                   engine: "google_maps_reviews",
-                   data_id: place.data_id,
-                   api_key: SERPAPI_KEY,
-                   sort: "newestFirst" // Importante: ver actividad reciente
-               });
-               reviewsData = reviewsResponse;
-               */
-                // MOCK TEMPORAL PARA NO GASTAR CREDITOS EN DESARROLLO (El usuario puede descomentar)
-                // Simular actividad basada en el rating count que ya tenemos
-                reviewsData = { reviews: [] };
-            } catch (e) {
-                console.error("Error fetching reviews", e);
-            }
-        }
+        // --- BUSQUEDA DE SEÑALES DE NEGOCIO ---
+        const searchQuery = `${place.title} ${place.address || ''}`;
 
-        // 2. Social Media Discovery (Identity)
-        // Buscamos "Nombre Negocio City Facebook Instagram"
-        const socialQuery = `${place.title} ${place.address || ''} Facebook Instagram`;
         let socialLinks: { facebook?: string, instagram?: string } = {};
+        let hasAds = false;
+        let reasons: string[] = [];
+        let score = 0;
 
         try {
+            // Buscamos señales en una sola ráfaga de Search para ahorrar créditos y tiempo
             const searchResponse = await getJson({
                 engine: "google",
-                q: socialQuery,
+                q: searchQuery,
                 api_key: SERPAPI_KEY,
-                num: 5 // Solo los primeros resultados
+                num: 8
             });
 
-            // Analizar snippets para encontrar links de FB/Insta
-            const organicResults = searchResponse.organic_results || [];
-            organicResults.forEach((result: any) => {
+            const organic = searchResponse.organic_results || [];
+            const ads = searchResponse.ads || [];
+
+            // 1. Detección de Inversión (Dinero)
+            if (ads.length > 0) {
+                hasAds = true;
+                score += 35;
+                reasons.push("Invierte en Publicidad (Google Ads)");
+            }
+
+            // 2. Presencia Digital (Identidad)
+            organic.forEach((result: any) => {
                 if (result.link.includes("facebook.com") && !socialLinks.facebook) {
                     socialLinks.facebook = result.link;
+                    score += 15;
+                    reasons.push("Marca activa en Facebook");
                 }
                 if (result.link.includes("instagram.com") && !socialLinks.instagram) {
                     socialLinks.instagram = result.link;
+                    score += 10;
+                    reasons.push("Presencia en Instagram");
                 }
             });
         } catch (e) {
-            console.error("Error searching social media", e);
+            console.error("Error en búsqueda de señales", e);
         }
 
-        // 3. Ad Detection (Money)
-        // Buscar si aparecen en anuncios por su propio nombre (Brand Protection) o categoría
-        // Esto es costoso de verificar reliably sin gastar mucho.
-        // Usaremos un heurístico: Si tiene sitio web y buen rating, asumimos potencial.
-        // Si queremos ser estrictos: Buscar "category in city" y ver si sale en ads.
-        const hasAds = false; // Placeholder for now unless we implement heavy search
-
-        // CALCULAR EL PREMIUM RANK
-        // Algoritmo de Ranking CLAVE.AI
-        // ---------------------------------------------------------
-        let score = 0;
-        const reasons: string[] = [];
-
-        // Factor 1: Reputación (Base) - Max 40 pts
+        // 3. Análisis de Calidad Local (Google Maps Data)
         if (place.rating && place.rating >= 4.5) {
-            score += 40;
-            reasons.push("Reputación Impecable (4.5+)");
-        } else if (place.rating && place.rating >= 4.0) {
             score += 20;
-            reasons.push("Buena Reputación");
+            reasons.push("Reputación Excelente (Top 10%)");
         }
 
-        // Factor 2: Actividad (Vida) - Max 30 pts
-        // Si tiene muchas reviews, asumimos actividad
-        if (place.reviews && place.reviews > 50) {
-            score += 30;
-            reasons.push("Alta Actividad de Clientes (+50 reviews)");
-        } else if (place.reviews && place.reviews > 10) {
-            score += 10;
-        }
-
-        // Factor 3: Identidad Digital (Social) - Max 20 pts
-        if (socialLinks.facebook || socialLinks.instagram) {
+        if (place.reviews && place.reviews > 40) {
             score += 20;
-            reasons.push("Presencia Social Activa");
+            reasons.push("Flujo constante de clientes (+40 reviews)");
         }
 
-        // Factor 4: Website (Profesionalismo) - Max 10 pts
         if (place.website) {
             score += 10;
-            reasons.push("Sitio Web Profesional");
+            reasons.push("Infraestructura Web Propia");
         }
 
-        // Determinar Rank
+        // --- CLASIFICACIÓN FINAL ---
         let rank: EnrichedProspectData['premiumRank'] = 'Bronze';
-        if (score >= 90) rank = 'Diamond';
-        else if (score >= 70) rank = 'Gold';
-        else if (score >= 40) rank = 'Silver';
+        if (score >= 80) rank = 'Diamond';
+        else if (score >= 60) rank = 'Gold';
+        else if (score >= 30) rank = 'Silver';
+
+        // Si no tiene nada de lo anterior, es Bronze por defecto
+        if (reasons.length === 0) {
+            reasons.push("Sin señales digitales claras detectadas");
+        }
 
         const enrichedData: EnrichedProspectData = {
             lastDataCheck: new Date().toISOString(),
             hasActiveAds: hasAds,
-            adsCount: 0,
-            ownerResponds: false, // Necesitaríamos leer las reviews reales
+            adsCount: hasAds ? 1 : 0,
+            ownerResponds: false,
             facebookUrl: socialLinks.facebook,
             premiumRank: rank,
             premiumScore: score,
