@@ -160,7 +160,7 @@ export default function Home() {
       } : (aiVerdict ? {
         status: (aiVerdict.verdict === 'prospect' ? 'relevant' : aiVerdict.verdict === 'irrelevant' ? 'discard' : 'neutral') as 'relevant' | 'neutral' | 'discard',
         confidence: 70,
-        reason: `🤖 ${aiVerdict.reason}`,
+        reason: finalReason || `🤖 ${aiVerdict.reason}`,
         matchedTerms: [],
         matchedNegatives: [],
         score: 0,

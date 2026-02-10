@@ -151,6 +151,11 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                                 <span className="line-clamp-1">{reason}</span>
                             </div>
                         ))
+                    ) : nicheMatch ? (
+                        <div className="flex items-center gap-2 text-[10px] text-gray-300">
+                            <Check size={10} className="text-emerald-500 flex-shrink-0 opacity-50" />
+                            <span className="line-clamp-1 italic">{nicheMatch.reason}</span>
+                        </div>
                     ) : (
                         <div className="flex flex-col gap-2">
                             <div className="h-2 w-24 bg-white/5 rounded animate-pulse" />
