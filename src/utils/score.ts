@@ -57,14 +57,55 @@ export function calculateClaveScore(place: any): ScoreBreakdown {
     };
 }
 
-// --- Niche Relevance Match ---
+// --- Niche Relevance Match (v2 — Vocabulary-based) ---
 
 export interface NicheMatchResult {
     status: 'relevant' | 'neutral' | 'discard';
     confidence: number; // 0-100
     reason: string;
-    matchedKeywords: string[];
+    matchedTerms: string[];
     matchedNegatives: string[];
+    score: number; // raw weighted score
+}
+
+// Spanish stop words to ignore during vocabulary extraction
+const STOP_WORDS = new Set([
+    'para', 'de', 'del', 'los', 'las', 'con', 'por', 'una', 'uno',
+    'que', 'este', 'esta', 'estos', 'estas', 'como', 'más', 'pero',
+    'sus', 'les', 'muy', 'sin', 'sobre', 'entre', 'todo', 'ser',
+    'son', 'tiene', 'fue', 'desde', 'otros', 'otras', 'cada', 'tipo'
+]);
+
+/**
+ * Extract a weighted vocabulary from all niche keywords.
+ * Words that appear in multiple keywords get higher weight (they're core domain terms).
+ * Returns Map<word, weight> where weight = number of keywords containing it.
+ */
+function buildVocabulary(keywords: string[]): Map<string, number> {
+    const vocab = new Map<string, number>();
+    for (const kw of keywords) {
+        const words = kw.toLowerCase().split(/\s+/)
+            .filter(w => w.length > 3 && !STOP_WORDS.has(w));
+        // Deduplicate within same keyword phrase
+        const unique = new Set(words);
+        for (const word of unique) {
+            vocab.set(word, (vocab.get(word) || 0) + 1);
+        }
+    }
+    return vocab;
+}
+
+/**
+ * Check if two words match via stem similarity.
+ * "motosierra" ↔ "motosierras", "taller" ↔ "talleres", "refaccion" ↔ "refacciones"
+ */
+function stemMatch(vocabWord: string, textWord: string): boolean {
+    if (vocabWord === textWord) return true;
+    // One contains the other (handles plural/singular)
+    if (vocabWord.length >= 4 && textWord.length >= 4) {
+        if (textWord.startsWith(vocabWord) || vocabWord.startsWith(textWord)) return true;
+    }
+    return false;
 }
 
 export function calculateNicheMatch(
@@ -72,72 +113,97 @@ export function calculateNicheMatch(
     nicheKeywords: string[],
     negativeKeywords: string[]
 ): NicheMatchResult {
-    // Text to analyze (lowercase for comparison)
+    // Build vocabulary from ALL niche keywords
+    const vocab = buildVocabulary(nicheKeywords);
+
+    // Text sources with different weights
     const title = (place.title || '').toLowerCase();
     const type = (place.type || '').toLowerCase();
-    const address = (place.address || '').toLowerCase();
     const description = (place.description || '').toLowerCase();
-    const combined = `${title} ${type} ${address} ${description}`;
+    const address = (place.address || '').toLowerCase();
 
-    const matchedKeywords: string[] = [];
-    const matchedNegatives: string[] = [];
+    // Tokenize each source
+    const titleWords = title.split(/\s+/).filter((w: string) => w.length > 2);
+    const typeWords = type.split(/\s+/).filter((w: string) => w.length > 2);
+    const descWords = description.split(/\s+/).filter((w: string) => w.length > 2);
 
-    // Check positive keywords (split into individual words for partial matching)
-    for (const kw of nicheKeywords) {
-        const kwWords = kw.toLowerCase().split(/\s+/);
-        // A keyword matches if at least 2 of its words appear (or all if keyword is 1-2 words)
-        const minWordsToMatch = Math.min(kwWords.length, 2);
-        const wordsFound = kwWords.filter(w => w.length > 3 && combined.includes(w));
-        if (wordsFound.length >= minWordsToMatch) {
-            matchedKeywords.push(kw);
+    const matchedTerms: string[] = [];
+    let weightedScore = 0;
+
+    // Check each vocab term against business text
+    for (const [vocabWord, frequency] of vocab.entries()) {
+        // Title match = strongest signal (x3 weight)
+        const inTitle = titleWords.some((tw: string) => stemMatch(vocabWord, tw));
+        // Type/category match = strong signal (x2 weight)
+        const inType = typeWords.some((tw: string) => stemMatch(vocabWord, tw));
+        // Description match = normal signal (x1 weight)
+        const inDesc = descWords.some((dw: string) => stemMatch(vocabWord, dw));
+
+        if (inTitle || inType || inDesc) {
+            matchedTerms.push(vocabWord);
+            // Score = frequency_weight * position_weight
+            const positionWeight = inTitle ? 3 : inType ? 2 : 1;
+            weightedScore += frequency * positionWeight;
         }
     }
 
-    // Check negative keywords
+    // Check negative keywords (full phrase match in all text)
+    const allText = `${title} ${type} ${description} ${address}`;
+    const matchedNegatives: string[] = [];
     for (const neg of negativeKeywords) {
-        if (combined.includes(neg.toLowerCase())) {
+        if (allText.includes(neg.toLowerCase())) {
             matchedNegatives.push(neg);
         }
     }
 
-    // Decision logic
-    if (matchedNegatives.length > 0 && matchedKeywords.length === 0) {
+    // Penalty for negatives
+    const negPenalty = matchedNegatives.length * 5;
+    const finalScore = Math.max(0, weightedScore - negPenalty);
+
+    // Decision thresholds
+    // Score >= 3 = relevant (e.g., "motosierras" in title = freq(3) * title(3) = 9)
+    // Score 1-2 = neutral
+    // Score 0 with negatives = discard
+    if (matchedNegatives.length > 0 && finalScore <= 1) {
         return {
             status: 'discard',
             confidence: Math.min(90, 60 + matchedNegatives.length * 15),
-            reason: `Contiene: ${matchedNegatives.join(', ')}`,
-            matchedKeywords,
-            matchedNegatives
+            reason: `❌ ${matchedNegatives.join(', ')}`,
+            matchedTerms,
+            matchedNegatives,
+            score: finalScore
         };
     }
 
-    if (matchedKeywords.length > 0 && matchedNegatives.length === 0) {
+    if (finalScore >= 3) {
+        const topTerms = matchedTerms.slice(0, 3).join(', ');
         return {
             status: 'relevant',
-            confidence: Math.min(95, 50 + matchedKeywords.length * 20),
-            reason: `Coincide con: ${matchedKeywords.slice(0, 2).join(', ')}`,
-            matchedKeywords,
-            matchedNegatives
+            confidence: Math.min(95, 40 + finalScore * 5),
+            reason: `✅ ${topTerms}`,
+            matchedTerms,
+            matchedNegatives,
+            score: finalScore
         };
     }
 
-    if (matchedKeywords.length > 0 && matchedNegatives.length > 0) {
-        // Mixed signals
+    if (finalScore >= 1) {
         return {
-            status: matchedKeywords.length >= matchedNegatives.length ? 'neutral' : 'discard',
-            confidence: 40,
-            reason: `Señales mixtas: +${matchedKeywords.length} / -${matchedNegatives.length}`,
-            matchedKeywords,
-            matchedNegatives
+            status: 'neutral',
+            confidence: 30 + finalScore * 10,
+            reason: `⚠️ Coincidencia parcial: ${matchedTerms.join(', ')}`,
+            matchedTerms,
+            matchedNegatives,
+            score: finalScore
         };
     }
 
-    // No matches at all — neutral
     return {
         status: 'neutral',
-        confidence: 20,
-        reason: 'Sin coincidencias claras',
-        matchedKeywords,
-        matchedNegatives
+        confidence: 10,
+        reason: '⚠️ Sin coincidencias',
+        matchedTerms,
+        matchedNegatives,
+        score: 0
     };
 }

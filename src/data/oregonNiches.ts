@@ -30,7 +30,7 @@ export const oregonNiches: Niche[] = [
             "Taller mecánico de herramientas forestales",
             "Venta de limas y accesorios de afilado"
         ],
-        negativeKeywords: ["home depot", "lowes", "walmart", "truper", "pretul"]
+        negativeKeywords: ["home depot", "lowes", "walmart", "truper", "pretul", "motocicleta", "scooter", "cuatrimoto", "bicicleta", "gimnasio", "restaurante", "hotel", "farmacia", "dentista"]
     },
     {
         id: 'field_contractor',

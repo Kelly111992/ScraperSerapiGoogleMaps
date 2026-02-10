@@ -61,13 +61,17 @@ export default function Home() {
       return [...scored].sort((a, b) => b.score.total - a.score.total);
     }
 
-    // If niche is active, sort: relevant first, neutral middle, discard last
+    // If niche is active, sort: relevant first (higher score first), neutral middle, discard last
     if (activeNiche) {
       const order: Record<string, number> = { relevant: 0, neutral: 1, discard: 2 };
       return [...scored].sort((a, b) => {
         const aOrder = a.nicheMatch ? (order[a.nicheMatch.status] ?? 1) : 1;
         const bOrder = b.nicheMatch ? (order[b.nicheMatch.status] ?? 1) : 1;
-        return aOrder - bOrder;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        // Within same group, sort by niche match score (higher = first)
+        const aScore = a.nicheMatch?.score ?? 0;
+        const bScore = b.nicheMatch?.score ?? 0;
+        return bScore - aScore;
       });
     }
 

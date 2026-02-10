@@ -7,8 +7,9 @@ interface NicheMatch {
     status: 'relevant' | 'neutral' | 'discard';
     confidence: number;
     reason: string;
-    matchedKeywords: string[];
+    matchedTerms: string[];
     matchedNegatives: string[];
+    score: number;
 }
 
 interface PlaceCardProps {
