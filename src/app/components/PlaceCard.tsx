@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Star, MapPin, Navigation, Check, ShieldCheck, ShieldX, Gem, FastForward, Facebook, Instagram, Globe, AlertCircle, Loader2 } from 'lucide-react';
+import { Star, MapPin, Navigation, Check, ShieldCheck, ShieldX, Gem, FastForward, Facebook, Globe, AlertCircle, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Place } from '@/types';
@@ -34,16 +34,21 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
 
     const handleEnrich = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!onEnrich) return;
+        if (!onEnrich || enriching) return;
+
+        console.log("Button clicked for:", title);
         setEnriching(true);
         try {
             await onEnrich(place);
+            console.log("Enrichment finished for:", title);
+        } catch (err) {
+            console.error("Enrichment call failed:", err);
         } finally {
             setEnriching(false);
         }
     };
 
-    // Estilos por Rango
+    // Estilos por Rango (Solo si vienen de enrichedData real)
     const rankConfig = {
         'Diamond': { color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/30', icon: <Gem size={14} className="animate-pulse" /> },
         'Gold': { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', icon: <Star size={14} /> },
@@ -51,6 +56,8 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
         'Bronze': { color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30', icon: <AlertCircle size={14} /> },
     };
 
+    // Asegurarnos de que el rank viene de nuestro análisis profundo
+    const hasBeenEnriched = !!enrichedData;
     const currentRank = enrichedData?.premiumRank ? rankConfig[enrichedData.premiumRank] : null;
 
     return (
@@ -75,7 +82,7 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                     <div
                         onClick={(e) => {
                             e.stopPropagation();
-                            onToggleSelect?.(place.place_id);
+                            onToggleSelect?.(place.place_id || place.place_id_search || "");
                         }}
                         className={cn(
                             "w-6 h-6 rounded-md border flex items-center justify-center cursor-pointer transition-colors backdrop-blur-sm",
@@ -103,8 +110,8 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                     </div>
                 )}
 
-                {/* Ranking Badge Overlay */}
-                {currentRank && (
+                {/* Ranking Badge Overlay - SOLO SI HA SIDO ENRIQUECIDO */}
+                {hasBeenEnriched && currentRank && (
                     <div className={cn(
                         "absolute top-3 left-3 z-10 px-2 py-1 rounded-lg backdrop-blur-md border flex items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase",
                         currentRank.bg, currentRank.color, currentRank.border
@@ -163,18 +170,24 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    {!enrichedData && onEnrich && (
+                    {/* Botón de Analizar - Solo si no hay datos enriquecidos */}
+                    {!hasBeenEnriched && onEnrich && (
                         <button
                             onClick={handleEnrich}
                             disabled={enriching}
                             className="w-full py-2 px-4 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all duration-300 text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                             {enriching ? (
-                                <Loader2 size={14} className="animate-spin" />
+                                <>
+                                    <Loader2 size={14} className="animate-spin" />
+                                    <span>ANALIZANDO...</span>
+                                </>
                             ) : (
-                                <FastForward size={14} />
+                                <>
+                                    <FastForward size={14} />
+                                    <span>ANALIZAR PREMIUM</span>
+                                </>
                             )}
-                            ANALIZAR PREMIUM
                         </button>
                     )}
 

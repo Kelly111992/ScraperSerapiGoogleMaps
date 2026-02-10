@@ -56,10 +56,15 @@ export default function Home() {
   // Run Deep Analysis for a specific prospect
   const handleEnrichPlace = async (place: Place) => {
     const id = place.place_id || place.place_id_search;
-    if (!id || enrichedDataMap[id]) return;
+    console.log("Enriching place:", id, place.title);
+    if (!id || enrichedDataMap[id]) {
+      console.log("Skipping enrichment: Already enriched or no ID");
+      return;
+    }
 
     try {
       const res = await axios.post('/api/enrich-prospect', { place });
+      console.log("Enrichment response:", res.data);
       if (res.data.enrichedData) {
         setEnrichedDataMap(prev => ({
           ...prev,
