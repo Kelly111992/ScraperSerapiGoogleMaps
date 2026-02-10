@@ -10,6 +10,7 @@ interface NicheMatch {
     matchedTerms: string[];
     matchedNegatives: string[];
     score: number;
+    aiVerdict?: string;
 }
 
 interface PlaceCardProps {

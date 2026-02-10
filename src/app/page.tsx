@@ -42,33 +42,96 @@ export default function Home() {
   // Niche State (for local relevance filtering)
   const [selectedNicheId, setSelectedNicheId] = useState<string>('');
 
+  // AI Analysis State
+  const [aiVerdicts, setAiVerdicts] = useState<Record<string, { verdict: string; reason: string }>>({});
+  const [analyzing, setAnalyzing] = useState(false);
+
   // Get active niche for filtering
   const activeNiche = oregonNiches.find(n => n.id === selectedNicheId);
 
-  // Process and sort results (with niche match if active)
+  // Run batch AI analysis
+  const runAiAnalysis = async (businesses: any[], niche: any) => {
+    if (!niche || businesses.length === 0) return;
+    setAnalyzing(true);
+    try {
+      const res = await axios.post('/api/analyze-batch', {
+        businesses,
+        niche: {
+          name: niche.name,
+          description: niche.description,
+          keywords: niche.keywords
+        }
+      });
+      if (res.data.results) {
+        setAiVerdicts(prev => ({ ...prev, ...res.data.results }));
+      }
+    } catch (err) {
+      console.error('AI analysis error:', err);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // Process and sort results (hybrid: local keywords + AI verdicts)
   const displayedResults = useMemo(() => {
-    // Add score + niche match to each result
     const scored = results.map(place => {
       const score = calculateClaveScore(place);
       const nicheMatch = activeNiche
         ? calculateNicheMatch(place, activeNiche.keywords, activeNiche.negativeKeywords)
         : undefined;
-      return { ...place, score, nicheMatch };
+
+      // Get AI verdict if available
+      const placeId = place.place_id || place.place_id_search;
+      const aiVerdict = placeId ? aiVerdicts[placeId] : undefined;
+
+      // HYBRID: Combine local + AI into final status
+      let finalStatus = nicheMatch?.status || 'neutral';
+      let finalReason = nicheMatch?.reason || '';
+
+      if (aiVerdict) {
+        if (aiVerdict.verdict === 'irrelevant') {
+          // AI says irrelevant → override to discard (even if local says neutral)
+          finalStatus = 'discard';
+          finalReason = `🤖 ${aiVerdict.reason}`;
+        } else if (aiVerdict.verdict === 'prospect') {
+          // AI says prospect → upgrade to relevant (even if local missed it)
+          finalStatus = 'relevant';
+          finalReason = `🤖 ${aiVerdict.reason}`;
+        } else if (aiVerdict.verdict === 'uncertain' && nicheMatch) {
+          // AI uncertain → keep local verdict but note it
+          finalReason = `${nicheMatch.reason} | 🤖 Incierto`;
+        }
+      }
+
+      // Build enhanced nicheMatch
+      const enhancedMatch = nicheMatch ? {
+        ...nicheMatch,
+        status: finalStatus as 'relevant' | 'neutral' | 'discard',
+        reason: finalReason,
+        aiVerdict: aiVerdict?.verdict
+      } : (aiVerdict ? {
+        status: (aiVerdict.verdict === 'prospect' ? 'relevant' : aiVerdict.verdict === 'irrelevant' ? 'discard' : 'neutral') as 'relevant' | 'neutral' | 'discard',
+        confidence: 70,
+        reason: `🤖 ${aiVerdict.reason}`,
+        matchedTerms: [],
+        matchedNegatives: [],
+        score: 0,
+        aiVerdict: aiVerdict.verdict
+      } : undefined);
+
+      return { ...place, score, nicheMatch: enhancedMatch };
     });
 
-    // Sort: by score, or by relevance (niche discards go to bottom)
     if (sortBy === 'score') {
       return [...scored].sort((a, b) => b.score.total - a.score.total);
     }
 
-    // If niche is active, sort: relevant first (higher score first), neutral middle, discard last
     if (activeNiche) {
       const order: Record<string, number> = { relevant: 0, neutral: 1, discard: 2 };
       return [...scored].sort((a, b) => {
         const aOrder = a.nicheMatch ? (order[a.nicheMatch.status] ?? 1) : 1;
         const bOrder = b.nicheMatch ? (order[b.nicheMatch.status] ?? 1) : 1;
         if (aOrder !== bOrder) return aOrder - bOrder;
-        // Within same group, sort by niche match score (higher = first)
         const aScore = a.nicheMatch?.score ?? 0;
         const bScore = b.nicheMatch?.score ?? 0;
         return bScore - aScore;
@@ -76,7 +139,7 @@ export default function Home() {
     }
 
     return scored;
-  }, [results, sortBy, activeNiche]);
+  }, [results, sortBy, activeNiche, aiVerdicts]);
 
   const handleSearch = async (query: string, location: string) => {
     setLoading(true);
@@ -108,20 +171,26 @@ export default function Home() {
       const response = await axios.post('/api/serpapi', params);
 
       if (response.data.local_results) {
-        setResults(response.data.local_results);
+        const newResults = response.data.local_results;
+        setResults(newResults);
 
         // Check for pagination - Token OR Start offset
         if (response.data.serpapi_pagination?.next_page_token) {
           setNextPageToken(response.data.serpapi_pagination.next_page_token);
-          setNextOffset(0); // Reset offset if we have a token
+          setNextOffset(0);
         } else {
           setNextPageToken(null);
-          // If we have full 20 results, assume there might be more and use offset
-          if (response.data.local_results.length >= 20) {
+          if (newResults.length >= 20) {
             setNextOffset(20);
           } else {
-            setNextOffset(0); // End of results
+            setNextOffset(0);
           }
+        }
+
+        // 🤖 Auto-trigger AI analysis if niche is active
+        const currentNiche = oregonNiches.find(n => n.id === selectedNicheId);
+        if (currentNiche) {
+          runAiAnalysis(newResults, currentNiche);
         }
       } else if (response.data.error) {
         setError(response.data.error);
@@ -409,6 +478,30 @@ export default function Home() {
                 <MapPin size={14} />
                 <span>Mostrando locales destacados</span>
               </div>
+            </div>
+          )}
+
+          {/* AI Analysis Banner */}
+          {analyzing && (
+            <div className="mx-6 mb-4 p-3 bg-gradient-to-r from-blue-900/40 to-purple-900/40 border border-blue-500/30 rounded-xl flex items-center gap-3 animate-pulse">
+              <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-blue-300 text-sm font-medium">🤖 Analizando prospectos con IA...</span>
+            </div>
+          )}
+
+          {/* Niche Match Summary */}
+          {activeNiche && !loading && results.length > 0 && !analyzing && Object.keys(aiVerdicts).length > 0 && (
+            <div className="mx-6 mb-4 p-3 bg-[#0f111a] border border-white/5 rounded-xl flex items-center gap-4 text-xs">
+              <span className="text-emerald-400 font-medium">
+                ✅ {displayedResults.filter(r => r.nicheMatch?.status === 'relevant').length} Prospectos
+              </span>
+              <span className="text-amber-400 font-medium">
+                ⚠️ {displayedResults.filter(r => r.nicheMatch?.status === 'neutral').length} Inciertos
+              </span>
+              <span className="text-red-400 font-medium">
+                ❌ {displayedResults.filter(r => r.nicheMatch?.status === 'discard').length} Descartados
+              </span>
+              <span className="text-gray-500 ml-auto">Análisis Híbrido: Keywords + IA</span>
             </div>
           )}
 
