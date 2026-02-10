@@ -442,27 +442,8 @@ export default function Home() {
                 <h2 className="text-2xl font-bold text-white">Resultados ({results.length})</h2>
 
                 {/* Sorting Links */}
-                <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
-                  <button
-                    onClick={() => setSortBy('relevance')}
-                    className={cn(
-                      "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
-                      sortBy === 'relevance' ? "bg-white/10 text-white shadow-sm" : "text-gray-400 hover:text-white"
-                    )}
-                  >
-                    <MapPin size={12} />
-                    Relevancia
-                  </button>
-                  <button
-                    onClick={() => setSortBy('score')}
-                    className={cn(
-                      "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
-                      sortBy === 'score' ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-sm" : "text-gray-400 hover:text-white"
-                    )}
-                  >
-                    <Star size={12} />
-                    Clave Score
-                  </button>
+                <div className="flex bg-white/5 rounded-lg p-1 border border-white/10 opacity-50 cursor-not-allowed hidden">
+                  {/* Sorting controls removed as requested */}
                 </div>
 
                 {/* Select All Button */}

@@ -73,18 +73,7 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                 </div>
             )}
 
-            {/* Score Badge */}
-            {score && (
-                <div className={cn(
-                    "absolute top-3 right-3 z-20 px-2 py-1 rounded-lg text-xs font-bold backdrop-blur-md border shadow-lg",
-                    score.tier === 'Premium' ? "bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black border-amber-300/50" :
-                        score.tier === 'High' ? "bg-green-500/90 text-white border-green-400/30" :
-                            score.tier === 'Medium' ? "bg-blue-500/90 text-white border-blue-400/30" :
-                                "bg-gray-600/90 text-gray-200 border-gray-500/30"
-                )}>
-                    {score.total} <span className="text-[10px] opacity-80 uppercase tracking-wider ml-0.5">{score.tier}</span>
-                </div>
-            )}
+
 
             <div className="relative h-48 w-full overflow-hidden bg-gray-800">
                 {thumbnail ? (
@@ -130,16 +119,14 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                     )}
                 </div>
 
-                {/* Niche Match Badge */}
-                {nicheMatch && (
+                {/* Niche Match Badge — only show for definitive classifications */}
+                {nicheMatch && nicheMatch.status !== 'neutral' && (
                     <div className={cn(
                         "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium mb-3 border",
                         nicheMatch.status === 'relevant' && "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-                        nicheMatch.status === 'neutral' && "bg-amber-500/10 text-amber-400 border-amber-500/20",
                         nicheMatch.status === 'discard' && "bg-red-500/10 text-red-400 border-red-500/20"
                     )}>
                         {nicheMatch.status === 'relevant' && <ShieldCheck size={14} />}
-                        {nicheMatch.status === 'neutral' && <ShieldAlert size={14} />}
                         {nicheMatch.status === 'discard' && <ShieldX size={14} />}
                         <span className="truncate">{nicheMatch.reason}</span>
                     </div>
