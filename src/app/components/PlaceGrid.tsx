@@ -1,15 +1,24 @@
 import React from 'react';
 import PlaceCard from './PlaceCard';
+import { Place } from '@/types';
 
 interface PlaceGridProps {
-    places: any[];
-    onSelectPlace: (place: any) => void;
+    places: Place[];
+    onSelectPlace: (place: Place) => void;
     isLoading?: boolean;
     selectedIds: Set<string>;
     onToggleSelect: (placeId: string) => void;
+    onEnrichPlace?: (place: Place) => Promise<void>;
 }
 
-const PlaceGrid: React.FC<PlaceGridProps> = ({ places, onSelectPlace, isLoading, selectedIds, onToggleSelect }) => {
+const PlaceGrid: React.FC<PlaceGridProps> = ({
+    places,
+    onSelectPlace,
+    isLoading,
+    selectedIds,
+    onToggleSelect,
+    onEnrichPlace
+}) => {
     if (isLoading) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
@@ -27,16 +36,15 @@ const PlaceGrid: React.FC<PlaceGridProps> = ({ places, onSelectPlace, isLoading,
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6 pb-20">
             {places.map((place, index) => {
-                const id = place.place_id || place.place_id_search;
+                const id = place.place_id || `place-${index}`;
                 return (
                     <PlaceCard
-                        key={id || index}
+                        key={id}
                         place={place}
                         onSelect={onSelectPlace}
                         isSelected={id ? selectedIds.has(id) : false}
                         onToggleSelect={onToggleSelect}
-                        score={place.score}
-                        nicheMatch={place.nicheMatch}
+                        onEnrich={onEnrichPlace}
                         selectable={true}
                     />
                 );

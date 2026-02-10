@@ -1,26 +1,16 @@
-import React from 'react';
-import { Star, MapPin, Navigation, Check, ShieldCheck, ShieldAlert, ShieldX } from 'lucide-react';
+import React, { useState } from 'react';
+import { Star, MapPin, Navigation, Check, ShieldCheck, ShieldX, Gem, FastForward, Facebook, Instagram, Globe, AlertCircle, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-
-interface NicheMatch {
-    status: 'relevant' | 'neutral' | 'discard';
-    confidence: number;
-    reason: string;
-    matchedTerms: string[];
-    matchedNegatives: string[];
-    score: number;
-    aiVerdict?: string;
-}
+import { Place } from '@/types';
 
 interface PlaceCardProps {
-    place: any;
-    onSelect: (place: any) => void;
+    place: Place;
+    onSelect: (place: Place) => void;
     selectable?: boolean;
     isSelected?: boolean;
     onToggleSelect?: (id: string) => void;
-    score?: { total: number, tier: string };
-    nicheMatch?: NicheMatch;
+    onEnrich?: (place: Place) => Promise<void>;
     className?: string;
 }
 
@@ -34,25 +24,51 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
     selectable = false,
     isSelected = false,
     onToggleSelect,
-    score,
-    nicheMatch,
+    onEnrich,
     className
 }) => {
-    const { title, thumbnail, rating, reviews, address, place_id, place_id_search, open_state, phone, website } = place;
-    const idToUse = place_id || place_id_search;
+    const [enriching, setEnriching] = useState(false);
+    const { title, thumbnail, rating, reviews, address, website, nicheMatch, enrichedData } = place;
 
     const isDiscard = nicheMatch?.status === 'discard';
+
+    const handleEnrich = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!onEnrich) return;
+        setEnriching(true);
+        try {
+            await onEnrich(place);
+        } finally {
+            setEnriching(false);
+        }
+    };
+
+    // Estilos por Rango
+    const rankConfig = {
+        'Diamond': { color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/30', icon: <Gem size={14} className="animate-pulse" /> },
+        'Gold': { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', icon: <Star size={14} /> },
+        'Silver': { color: 'text-slate-300', bg: 'bg-slate-500/10', border: 'border-slate-500/30', icon: <ShieldCheck size={14} /> },
+        'Bronze': { color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30', icon: <AlertCircle size={14} /> },
+    };
+
+    const currentRank = enrichedData?.premiumRank ? rankConfig[enrichedData.premiumRank] : null;
 
     return (
         <div
             className={cn(
-                "group relative bg-[#0f111a] rounded-2xl overflow-hidden border transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 flex flex-col h-full",
+                "group relative bg-[#0f111a] rounded-2xl overflow-hidden border transition-all duration-500 flex flex-col h-full",
                 isSelected ? "border-purple-500 ring-1 ring-purple-500" : "border-white/5 hover:border-purple-500/50",
                 isDiscard && "opacity-50 hover:opacity-80",
+                enrichedData?.premiumRank === 'Diamond' && "shadow-[0_0_20px_rgba(34,211,238,0.1)] border-cyan-500/40",
                 className
             )}
             onClick={() => onSelect(place)}
         >
+            {/* Diamond Glow Effect */}
+            {enrichedData?.premiumRank === 'Diamond' && (
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent pointer-events-none" />
+            )}
+
             {/* Selection Checkbox Overlay */}
             {selectable && (
                 <div className="absolute top-3 left-3 z-20">
@@ -73,71 +89,108 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                 </div>
             )}
 
-
-
             <div className="relative h-48 w-full overflow-hidden bg-gray-800">
                 {thumbnail ? (
                     <img
                         src={thumbnail}
                         alt={title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         referrerPolicy="no-referrer"
-                        onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
-                            const fallbackIcon = document.createElement('div');
-                            fallbackIcon.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin opacity-20 text-gray-500"><path d="M20 10c0 6-9 13-9 13s-9-7-9-13a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg>`;
-                            e.currentTarget.parentElement?.appendChild(fallbackIcon);
-                        }}
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-500">
                         <MapPin size={48} className="opacity-20" />
                     </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
 
-                {rating && (
-                    <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1 border border-white/10">
-                        <Star size={14} className="text-yellow-400 fill-yellow-400" />
-                        <span className="text-white font-bold text-sm">{rating}</span>
-                        <span className="text-gray-400 text-xs">({reviews || 0})</span>
+                {/* Ranking Badge Overlay */}
+                {currentRank && (
+                    <div className={cn(
+                        "absolute top-3 left-3 z-10 px-2 py-1 rounded-lg backdrop-blur-md border flex items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase",
+                        currentRank.bg, currentRank.color, currentRank.border
+                    )}>
+                        {currentRank.icon}
+                        {enrichedData?.premiumRank}
                     </div>
                 )}
+
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+
+                <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
+                    {rating && (
+                        <div className="bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1 border border-white/10">
+                            <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                            <span className="text-white font-bold text-sm">{rating}</span>
+                            <span className="text-gray-400 text-[10px]">({reviews || 0})</span>
+                        </div>
+                    )}
+
+                    <div className="flex gap-1.5">
+                        {website && <div className="p-1.5 bg-white/10 backdrop-blur-md rounded-lg text-white/70 border border-white/5" title="Sitio Web"><Globe size={14} /></div>}
+                        {enrichedData?.facebookUrl && <div className="p-1.5 bg-blue-600/20 backdrop-blur-md rounded-lg text-blue-400 border border-blue-500/20" title="Facebook"><Facebook size={14} /></div>}
+                    </div>
+                </div>
             </div>
 
             <div className="p-5 flex-1 flex flex-col justify-between">
                 <div>
-                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-purple-300 transition-colors line-clamp-2">
+                    <h3 className={cn(
+                        "text-lg font-bold text-white mb-2 leading-tight transition-colors line-clamp-2",
+                        enrichedData?.premiumRank === 'Diamond' ? "group-hover:text-cyan-300" : "group-hover:text-purple-300"
+                    )}>
                         {title}
                     </h3>
+
                     {address && (
-                        <div className="flex items-start gap-2 text-gray-400 text-sm mb-3">
-                            <MapPin size={16} className="mt-1 flex-shrink-0 text-purple-400" />
-                            <p className="line-clamp-2">{address}</p>
+                        <div className="flex items-start gap-2 text-gray-400 text-xs mb-4">
+                            <MapPin size={14} className="mt-0.5 flex-shrink-0 text-purple-400" />
+                            <p className="line-clamp-1">{address}</p>
+                        </div>
+                    )}
+
+                    {/* Niche Match Badge */}
+                    {nicheMatch && nicheMatch.status !== 'neutral' && (
+                        <div className={cn(
+                            "flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-medium mb-4 border",
+                            nicheMatch.status === 'relevant' && "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                            nicheMatch.status === 'discard' && "bg-red-500/10 text-red-400 border-red-500/20"
+                        )}>
+                            {nicheMatch.status === 'relevant' && <ShieldCheck size={12} />}
+                            {nicheMatch.status === 'discard' && <ShieldX size={12} />}
+                            <span className="truncate">{nicheMatch.reason}</span>
                         </div>
                     )}
                 </div>
 
-                {/* Niche Match Badge — only show for definitive classifications */}
-                {nicheMatch && nicheMatch.status !== 'neutral' && (
-                    <div className={cn(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium mb-3 border",
-                        nicheMatch.status === 'relevant' && "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-                        nicheMatch.status === 'discard' && "bg-red-500/10 text-red-400 border-red-500/20"
-                    )}>
-                        {nicheMatch.status === 'relevant' && <ShieldCheck size={14} />}
-                        {nicheMatch.status === 'discard' && <ShieldX size={14} />}
-                        <span className="truncate">{nicheMatch.reason}</span>
-                    </div>
-                )}
+                <div className="flex flex-col gap-2">
+                    {!enrichedData && onEnrich && (
+                        <button
+                            onClick={handleEnrich}
+                            disabled={enriching}
+                            className="w-full py-2 px-4 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all duration-300 text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            {enriching ? (
+                                <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                                <FastForward size={14} />
+                            )}
+                            ANALIZAR PREMIUM
+                        </button>
+                    )}
 
-                <button
-                    className="w-full mt-auto py-2 px-4 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600 hover:text-white transition-all duration-300 font-medium flex items-center justify-center gap-2 group-hover:border-purple-500"
-                >
-                    <Navigation size={16} />
-                    Ver Detalles
-                </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onSelect(place); }}
+                        className={cn(
+                            "w-full py-2 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all duration-300",
+                            enrichedData?.premiumRank === 'Diamond'
+                                ? "bg-cyan-600 text-white hover:bg-cyan-500 shadow-lg shadow-cyan-900/20"
+                                : "bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600 hover:text-white"
+                        )}
+                    >
+                        <Navigation size={14} />
+                        VER DETALLES
+                    </button>
+                </div>
             </div>
         </div>
     );

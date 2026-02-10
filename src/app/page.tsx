@@ -11,13 +11,14 @@ import PlaceGrid from './components/PlaceGrid';
 import PlaceDetailsModal from './components/PlaceDetailsModal';
 import { calculateClaveScore, calculateNicheMatch } from '../utils/score';
 import { oregonNiches } from '../data/oregonNiches';
+import { Place, EnrichedProspectData } from '@/types';
 
 export function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
 export default function Home() {
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,11 +31,14 @@ export default function Home() {
 
   // Modal state
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
-  const [selectedPlaceInitialData, setSelectedPlaceInitialData] = useState<any>(null);
+  const [selectedPlaceInitialData, setSelectedPlaceInitialData] = useState<Place | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Selection & Export State
   const [selectedPlaceIds, setSelectedPlaceIds] = useState<Set<string>>(new Set());
+
+  // Deep Analysis State
+  const [enrichedDataMap, setEnrichedDataMap] = useState<Record<string, EnrichedProspectData>>({});
 
   // Sorting State
   const [sortBy, setSortBy] = useState<'relevance' | 'score'>('relevance');
@@ -49,8 +53,26 @@ export default function Home() {
   // Get active niche for filtering
   const activeNiche = oregonNiches.find(n => n.id === selectedNicheId);
 
+  // Run Deep Analysis for a specific prospect
+  const handleEnrichPlace = async (place: Place) => {
+    const id = place.place_id || place.place_id_search;
+    if (!id || enrichedDataMap[id]) return;
+
+    try {
+      const res = await axios.post('/api/enrich-prospect', { place });
+      if (res.data.enrichedData) {
+        setEnrichedDataMap(prev => ({
+          ...prev,
+          [id]: res.data.enrichedData
+        }));
+      }
+    } catch (err) {
+      console.error('Enrichment error:', err);
+    }
+  };
+
   // Run batch AI analysis
-  const runAiAnalysis = async (businesses: any[], niche: any) => {
+  const runAiAnalysis = async (businesses: Place[], niche: any) => {
     if (!niche || businesses.length === 0) return;
     setAnalyzing(true);
     try {
@@ -119,7 +141,10 @@ export default function Home() {
         aiVerdict: aiVerdict.verdict
       } : undefined);
 
-      return { ...place, score, nicheMatch: enhancedMatch };
+      // Merge enriched data if available
+      const enrichedData = placeId ? enrichedDataMap[placeId] : undefined;
+
+      return { ...place, score, nicheMatch: enhancedMatch, enrichedData };
     });
 
     if (sortBy === 'score') {
@@ -129,17 +154,25 @@ export default function Home() {
     if (activeNiche) {
       const order: Record<string, number> = { relevant: 0, neutral: 1, discard: 2 };
       return [...scored].sort((a, b) => {
+        // Prioritize Premium/Enriched results first within the same Relevance group
+        if (a.nicheMatch?.status === b.nicheMatch?.status) {
+          const aPremium = a.enrichedData ? 1 : 0;
+          const bPremium = b.enrichedData ? 1 : 0;
+          if (aPremium !== bPremium) return bPremium - aPremium;
+
+          const aScore = a.enrichedData?.premiumScore || a.nicheMatch?.score || 0;
+          const bScore = b.enrichedData?.premiumScore || b.nicheMatch?.score || 0;
+          return bScore - aScore;
+        }
+
         const aOrder = a.nicheMatch ? (order[a.nicheMatch.status] ?? 1) : 1;
         const bOrder = b.nicheMatch ? (order[b.nicheMatch.status] ?? 1) : 1;
-        if (aOrder !== bOrder) return aOrder - bOrder;
-        const aScore = a.nicheMatch?.score ?? 0;
-        const bScore = b.nicheMatch?.score ?? 0;
-        return bScore - aScore;
+        return aOrder - bOrder;
       });
     }
 
     return scored;
-  }, [results, sortBy, activeNiche, aiVerdicts]);
+  }, [results, sortBy, activeNiche, aiVerdicts, enrichedDataMap]);
 
   const handleSearch = async (query: string, location: string) => {
     setLoading(true);
@@ -471,18 +504,21 @@ export default function Home() {
           )}
 
           {/* Niche Match Summary */}
-          {activeNiche && !loading && results.length > 0 && !analyzing && Object.keys(aiVerdicts).length > 0 && (
+          {activeNiche && !loading && results.length > 0 && !analyzing && (Object.keys(aiVerdicts).length > 0 || Object.keys(enrichedDataMap).length > 0) && (
             <div className="mx-6 mb-4 p-3 bg-[#0f111a] border border-white/5 rounded-xl flex items-center gap-4 text-xs">
-              <span className="text-emerald-400 font-medium">
+              <span className="text-emerald-400 font-medium whitespace-nowrap">
                 ✅ {displayedResults.filter(r => r.nicheMatch?.status === 'relevant').length} Prospectos
               </span>
-              <span className="text-amber-400 font-medium">
+              <span className="text-amber-400 font-medium whitespace-nowrap">
                 ⚠️ {displayedResults.filter(r => r.nicheMatch?.status === 'neutral').length} Inciertos
               </span>
-              <span className="text-red-400 font-medium">
-                ❌ {displayedResults.filter(r => r.nicheMatch?.status === 'discard').length} Descartados
+              <span className="text-cyan-400 font-bold whitespace-nowrap">
+                💎 {displayedResults.filter(r => r.enrichedData?.premiumRank === 'Diamond').length} Diamond
               </span>
-              <span className="text-gray-500 ml-auto">Análisis Híbrido: Keywords + IA</span>
+              <span className="text-yellow-400 font-bold whitespace-nowrap">
+                ⭐ {displayedResults.filter(r => r.enrichedData?.premiumRank === 'Gold').length} Gold
+              </span>
+              <span className="text-gray-500 ml-auto hidden sm:block">Análisis Híbrido: Keywords + IA + Enriquecimiento</span>
             </div>
           )}
 
@@ -492,6 +528,7 @@ export default function Home() {
             isLoading={loading}
             selectedIds={selectedPlaceIds}
             onToggleSelect={toggleSelection}
+            onEnrichPlace={handleEnrichPlace}
           />
 
           {/* Pagination Load More */}
