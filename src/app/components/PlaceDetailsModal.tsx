@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Star, MapPin, Phone, Globe, Clock, ChevronRight, MessageSquare, Facebook, Mail, Users, ThumbsUp } from 'lucide-react';
 import axios from 'axios';
-import { cn } from './PlaceCard';
+import { cn } from '@/lib/utils';
 
 import ReviewsList from './ReviewsList';
 

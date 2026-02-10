@@ -36,7 +36,7 @@ export default function Home() {
   const [selectedPlaceIds, setSelectedPlaceIds] = useState<Set<string>>(new Set());
 
   // Sorting State
-  const [sortBy, setSortBy] = useState<'relevance' | 'score'>('score');
+  const [sortBy, setSortBy] = useState<'relevance' | 'score'>('relevance');
 
   // Process and sort results
   const displayedResults = useMemo(() => {
