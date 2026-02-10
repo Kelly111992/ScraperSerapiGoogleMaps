@@ -44,8 +44,8 @@ const PlaceGrid: React.FC<PlaceGridProps> = ({
                         onSelect={onSelectPlace}
                         isSelected={id ? selectedIds.has(id) : false}
                         onToggleSelect={onToggleSelect}
-                        onEnrich={onEnrichPlace}
                         selectable={true}
+                        rankIndex={index}
                     />
                 );
             })}

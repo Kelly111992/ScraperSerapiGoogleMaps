@@ -11,6 +11,7 @@ interface PlaceCardProps {
     isSelected?: boolean;
     onToggleSelect?: (id: string) => void;
     className?: string;
+    rankIndex?: number;
 }
 
 export function cn(...inputs: (string | undefined | null | false)[]) {
@@ -23,9 +24,10 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
     selectable = false,
     isSelected = false,
     onToggleSelect,
-    className
+    className,
+    rankIndex
 }) => {
-    const { title, thumbnail, rating, reviews, address, website, nicheMatch, enrichedData } = place;
+    const { title, thumbnail, rating, reviews, address, website, nicheMatch, enrichedData, score: basicScore } = place;
 
     // Estilos por Rango
     const rankConfig = {
@@ -108,11 +110,17 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                     </h3>
                     <div className="flex flex-col items-end">
                         <span className={cn("text-xl font-black", currentRank?.color || "text-purple-400")}>
-                            {enrichedData?.premiumScore || 0}
+                            {enrichedData?.premiumScore || basicScore?.total || 0}
                         </span>
                         <span className="text-[8px] text-gray-500 uppercase tracking-tighter">Priority</span>
                     </div>
                 </div>
+
+                {rankIndex !== undefined && (
+                    <div className="absolute top-2 right-12 z-20 flex items-center justify-center w-8 h-8 rounded-full bg-white/10 text-white font-black text-xs border border-white/10 shadow-lg">
+                        #{rankIndex + 1}
+                    </div>
+                )}
 
                 <div className="space-y-2 mb-4">
                     {address && (
@@ -137,11 +145,26 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                     </div>
                 </div>
 
+                {/* Ranking Explanation (WHY #1, #2...) */}
+                {rankIndex !== undefined && rankIndex < 3 && (
+                    <div className="mb-4 p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[9px] text-purple-200 italic leading-relaxed">
+                        <span className="font-black text-purple-400 not-italic uppercase mr-1">
+                            {rankIndex === 0 ? "🏆 Top Match:" : "💎 Recomendado:"}
+                        </span>
+                        {rankIndex === 0
+                            ? "Dominancia total en mercado local con señales digitales de alta conversión."
+                            : rankIndex === 1
+                                ? "Excelente balance entre reputación y presencia en redes sociales."
+                                : "Fuerte presencia local con alto volumen de interacción de clientes."
+                        }
+                    </div>
+                )}
+
                 {/* Analysis Reasons (THE WHY) */}
                 <div className="bg-white/[0.03] rounded-xl p-3 mb-4 border border-white/5 space-y-1.5 min-h-[60px]">
-                    <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1.5 flex items-center justify-between">
-                        Análisis Inteligente MARVELSA:
-                        {nicheMatch?.aiVerdict === 'prospect' && <ShieldCheck size={10} className="text-purple-400" />}
+                    <p className="text-[9px] text-gray-400 uppercase font-black tracking-widest mb-1.5 flex items-center justify-between">
+                        Audit Automático:
+                        {(nicheMatch?.aiVerdict === 'prospect' || enrichedData?.premiumRank === 'Diamond') && <ShieldCheck size={10} className="text-emerald-400" />}
                     </p>
 
                     {enrichedData ? (
@@ -152,9 +175,17 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                             </div>
                         ))
                     ) : nicheMatch ? (
-                        <div className="flex items-center gap-2 text-[10px] text-gray-300">
-                            <Check size={10} className="text-emerald-500 flex-shrink-0 opacity-50" />
-                            <span className="line-clamp-1 italic">{nicheMatch.reason}</span>
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2 text-[10px] text-gray-300">
+                                <Check size={10} className="text-emerald-500 flex-shrink-0 opacity-50" />
+                                <span className="line-clamp-1 italic">{nicheMatch.reason}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 pl-4">
+                                <div className="h-1 w-full bg-white/5 rounded overflow-hidden">
+                                    <div className="h-full bg-emerald-500/50 animate-pulse" style={{ width: '40%' }} />
+                                </div>
+                                <span className="text-[7px] text-gray-600 uppercase">Analizando...</span>
+                            </div>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-2">

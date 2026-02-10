@@ -62,18 +62,27 @@ export async function POST(request: Request) {
         }
 
         // 3. Análisis de Calidad Local (Google Maps Data)
-        if (place.rating && place.rating >= 4.5) {
+        const numRating = Number(place.rating || 0);
+        const numReviews = Number(place.reviews || 0);
+
+        if (numRating >= 4.5) {
             score += 20;
             reasons.push("Reputación Excelente (Top 10%)");
+        } else if (numRating >= 4.0) {
+            score += 10;
+            reasons.push("Buena Reputación local");
         }
 
-        if (place.reviews && place.reviews > 40) {
-            score += 20;
-            reasons.push("Flujo constante de clientes (+40 reviews)");
+        if (numReviews > 50) {
+            score += 25;
+            reasons.push("Alta Autoridad: +50 Reseñas");
+        } else if (numReviews > 10) {
+            score += 10;
+            reasons.push("Actividad local comprobada");
         }
 
         if (place.website) {
-            score += 10;
+            score += 15;
             reasons.push("Infraestructura Web Propia");
         }
 
