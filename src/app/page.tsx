@@ -183,18 +183,20 @@ export default function Home() {
       return [...scored]
         .filter(p => p.nicheMatch?.status !== 'discard') // OCULTAR DESCARTADOS
         .sort((a, b) => {
-          // 1. Prioridad: Priority Score (Enriquecidos)
-          const pScoreA = a.enrichedData?.premiumScore || 0;
-          const pScoreB = b.enrichedData?.premiumScore || 0;
-          if (pScoreA !== pScoreB) return pScoreB - pScoreA;
+          // 1. Prioridad: Score Efectivo (Premium si existe, sino Básico)
+          const pScoreA = a.enrichedData?.premiumScore || a.score.total || 0;
+          const pScoreB = b.enrichedData?.premiumScore || b.score.total || 0;
 
-          // 2. Relevancia de Nicho
+          if (pScoreA !== pScoreB) {
+            return pScoreB - pScoreA;
+          }
+
+          // 2. Relevancia de Nicho (en caso de empate de score)
           const statusA = a.nicheMatch?.status || 'neutral';
           const statusB = b.nicheMatch?.status || 'neutral';
           if (statusA !== statusB) return order[statusA] - order[statusB];
 
-          // 3. Score Básico
-          return b.score.total - a.score.total;
+          return 0;
         });
     }
 
@@ -231,6 +233,12 @@ export default function Home() {
 
       if (response.data.local_results) {
         const newResults = response.data.local_results;
+        console.log("Search Results Debug:", {
+          count: newResults.length,
+          firstResultKeys: Object.keys(newResults[0] || {}),
+          hasThumbnail: !!newResults[0]?.thumbnail,
+          thumbnailVal: newResults[0]?.thumbnail
+        });
         setResults(newResults);
 
         // Check for pagination - Token OR Start offset
