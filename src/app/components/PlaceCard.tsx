@@ -27,7 +27,9 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
     className,
     rankIndex
 }) => {
-    const { title, thumbnail, rating, reviews, address, website, nicheMatch, enrichedData, score: basicScore } = place;
+    const { title, rating, reviews, address, website, nicheMatch, enrichedData, score: basicScore } = place;
+    // Detección robusta de imagen (SerpApi usa varios campos según el motor)
+    const thumbnail = place.thumbnail || (place as any).thumbnail_url || (place as any).image || (place as any).photo;
 
     // Estilos por Rango
     const rankConfig = {

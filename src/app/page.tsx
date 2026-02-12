@@ -221,16 +221,14 @@ export default function Home() {
       console.log(`Searching for: ${fullQuery}`);
 
       const params: any = {
-        engine: 'google_maps',
-        type: 'search',
-        q: fullQuery,
+        engine: 'google',
+        tbm: 'lcl',
+        q: query,
+        location: location || 'Mexico',
+        hl: 'es',
+        gl: 'mx',
+        google_domain: 'google.com.mx'
       };
-
-      // Force Mexico if no specific location is provided to avoid US results
-      if (!location) {
-        params.gl = 'mx';
-        params.google_domain = 'google.com.mx';
-      }
 
       const response = await axios.post('/api/serpapi', params);
 
@@ -279,15 +277,14 @@ export default function Home() {
     try {
       const fullQuery = currentLocation ? `${currentQuery} en ${currentLocation}` : currentQuery;
       const params: any = {
-        engine: 'google_maps',
-        type: 'search',
-        q: fullQuery,
+        engine: 'google',
+        tbm: 'lcl',
+        q: currentQuery,
+        location: currentLocation || 'Mexico',
+        hl: 'es',
+        gl: 'mx',
+        google_domain: 'google.com.mx'
       };
-
-      if (!currentLocation) {
-        params.gl = 'mx';
-        params.google_domain = 'google.com.mx';
-      }
 
       if (nextPageToken) {
         params.next_page_token = nextPageToken;

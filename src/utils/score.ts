@@ -25,7 +25,7 @@ export function calculateClaveScore(place: any): ScoreBreakdown {
     const phoneScore = place.phone ? 15 : 0;
     total += phoneScore;
 
-    const photoScore = place.thumbnail ? 10 : 0;
+    const photoScore = (place.thumbnail || place.thumbnail_url || place.image || place.photo) ? 10 : 0;
     total += photoScore;
 
     total = Math.min(total, 100);
@@ -121,8 +121,8 @@ export function calculateNicheMatch(
     const typeWords = type.split(/\s+/);
 
     for (const [vocabWord, frequency] of vocab.entries()) {
-        const inTitle = titleWords.some(tw => stemMatch(vocabWord, tw));
-        const inType = typeWords.some(tw => stemMatch(vocabWord, tw));
+        const inTitle = titleWords.some((tw: string) => stemMatch(vocabWord, tw));
+        const inType = typeWords.some((tw: string) => stemMatch(vocabWord, tw));
 
         if (inTitle || inType) {
             matchedTerms.push(vocabWord);
