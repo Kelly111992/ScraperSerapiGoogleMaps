@@ -215,9 +215,9 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                         <Navigation size={14} />
                         VER DETALLES
                     </button>
-                    {(place.maps_url || (place as any).link) && (
+                    {(place.maps_url || (place as any).link || place.place_id || (place as any).cid) && (
                         <a
-                            href={place.maps_url || (place as any).link}
+                            href={place.maps_url || (place as any).link || (place.place_id ? `https://www.google.com/maps/place/?q=place_id:${place.place_id}` : `https://www.google.com/maps?cid=${(place as any).cid}`)}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}

@@ -234,7 +234,7 @@ export default function Home() {
       if (response.data.local_results) {
         const newResults = response.data.local_results.map((r: any) => ({
           ...r,
-          maps_url: r.link || r.maps_link
+          maps_url: r.link || r.maps_link || r.gps_link || (r.cid ? `https://www.google.com/maps?cid=${r.cid}` : undefined)
         }));
         console.log("Search Results Debug:", {
           count: newResults.length,
@@ -302,7 +302,7 @@ export default function Home() {
 
       const newResults = response.data.local_results.map((r: any) => ({
         ...r,
-        maps_url: r.link || r.maps_link
+        maps_url: r.link || r.maps_link || r.gps_link || (r.cid ? `https://www.google.com/maps?cid=${r.cid}` : undefined)
       }));
       setResults(prev => [...prev, ...newResults]);
 
