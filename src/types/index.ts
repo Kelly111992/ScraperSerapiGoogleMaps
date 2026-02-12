@@ -38,6 +38,7 @@ export interface Place {
     longitude?: number;
     description?: string;
     open_state?: string;
+    maps_url?: string;
 
     // Meta
     gps_coordinates?: {

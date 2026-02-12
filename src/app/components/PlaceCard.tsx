@@ -202,19 +202,31 @@ const PlaceCard: React.FC<PlaceCardProps> = ({
                 </div>
 
                 {/* Actions */}
-                <div className="mt-auto">
+                <div className="mt-auto flex gap-2">
                     <button
                         onClick={(e) => { e.stopPropagation(); onSelect(place); }}
                         className={cn(
-                            "w-full py-2.5 px-4 rounded-xl text-[10px] font-black tracking-widest flex items-center justify-center gap-2 transition-all duration-300",
+                            "flex-1 py-2.5 px-4 rounded-xl text-[10px] font-black tracking-widest flex items-center justify-center gap-2 transition-all duration-300",
                             enrichedData?.premiumRank === 'Diamond'
                                 ? "bg-cyan-600 text-white shadow-lg shadow-cyan-900/40"
                                 : "bg-white/5 text-white border border-white/10 hover:bg-white/10"
                         )}
                     >
                         <Navigation size={14} />
-                        VER DETALLES COMPLETOS
+                        VER DETALLES
                     </button>
+                    {(place.maps_url || (place as any).link) && (
+                        <a
+                            href={place.maps_url || (place as any).link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-red-500/10 hover:bg-red-500/20 text-red-400 p-2.5 rounded-xl border border-red-500/20 transition-all duration-300 group"
+                            title="Ver en Google Maps"
+                        >
+                            <MapPin size={16} className="group-hover:scale-110 transition-transform" />
+                        </a>
+                    )}
                 </div>
             </div>
         </div>

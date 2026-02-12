@@ -232,7 +232,10 @@ export default function Home() {
       const response = await axios.post('/api/serpapi', params);
 
       if (response.data.local_results) {
-        const newResults = response.data.local_results;
+        const newResults = response.data.local_results.map((r: any) => ({
+          ...r,
+          maps_url: r.link || r.maps_link
+        }));
         console.log("Search Results Debug:", {
           count: newResults.length,
           firstResultKeys: Object.keys(newResults[0] || {}),
@@ -297,21 +300,23 @@ export default function Home() {
 
       const response = await axios.post('/api/serpapi', params);
 
-      if (response.data.local_results) {
-        setResults(prev => [...prev, ...response.data.local_results]);
+      const newResults = response.data.local_results.map((r: any) => ({
+        ...r,
+        maps_url: r.link || r.maps_link
+      }));
+      setResults(prev => [...prev, ...newResults]);
 
-        // Update pagination state
-        if (response.data.serpapi_pagination?.next_page_token) {
-          setNextPageToken(response.data.serpapi_pagination.next_page_token);
-          setNextOffset(0); // Reset offset logic if we switched to tokens
+      // Update pagination state
+      if (response.data.serpapi_pagination?.next_page_token) {
+        setNextPageToken(response.data.serpapi_pagination.next_page_token);
+        setNextOffset(0); // Reset offset logic if we switched to tokens
+      } else {
+        setNextPageToken(null);
+        // Increment offset if we got results
+        if (response.data.local_results.length > 0) {
+          setNextOffset(prev => prev + 20);
         } else {
-          setNextPageToken(null);
-          // Increment offset if we got results
-          if (response.data.local_results.length > 0) {
-            setNextOffset(prev => prev + 20);
-          } else {
-            setNextOffset(0); // No more results
-          }
+          setNextOffset(0); // No more results
         }
       }
     } catch (err: any) {

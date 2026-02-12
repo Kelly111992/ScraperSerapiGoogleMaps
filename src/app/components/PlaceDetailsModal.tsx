@@ -265,6 +265,12 @@ const PlaceDetailsModal: React.FC<PlaceDetailsModalProps> = ({
                                         <span>{website}</span>
                                     </a>
                                 )}
+                                {(displayData.maps_url || displayData.link) && (
+                                    <a href={displayData.maps_url || displayData.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-red-400 hover:text-red-300 transition-colors">
+                                        <MapPin size={20} className="shrink-0" />
+                                        <span className="font-medium underline decoration-red-400/30 underline-offset-4">Ver en Google Maps</span>
+                                    </a>
+                                )}
                                 {hours && (
                                     <div className="flex items-start gap-3 text-gray-300">
                                         <Clock size={20} className="text-purple-400 mt-0.5 shrink-0" />
