@@ -220,13 +220,17 @@ export default function Home() {
 
       console.log(`Searching for: ${fullQuery}`);
 
-      const params = {
+      const params: any = {
         engine: 'google_maps',
         type: 'search',
         q: fullQuery,
-        // Removed hardcoded 'll' to allow Google to infer location from query
-        // or we could geocode the state, but text search usually works well for "Pizza in Monterrey"
       };
+
+      // Force Mexico if no specific location is provided to avoid US results
+      if (!location) {
+        params.gl = 'mx';
+        params.google_domain = 'google.com.mx';
+      }
 
       const response = await axios.post('/api/serpapi', params);
 
@@ -247,8 +251,9 @@ export default function Home() {
           }
         }
 
-        // 🤖 Auto-trigger AI analysis if niche is active
-        const currentNiche = oregonNiches.find(n => n.id === selectedNicheId);
+        // 🤖 Auto-trigger AI analysis
+        // Use selected niche OR fallback to the first strategic niche as "Default MARVELSA Analysis"
+        const currentNiche = oregonNiches.find(n => n.id === selectedNicheId) || oregonNiches[0];
         if (currentNiche) {
           runAiAnalysis(newResults, currentNiche);
         }
@@ -278,6 +283,11 @@ export default function Home() {
         type: 'search',
         q: fullQuery,
       };
+
+      if (!currentLocation) {
+        params.gl = 'mx';
+        params.google_domain = 'google.com.mx';
+      }
 
       if (nextPageToken) {
         params.next_page_token = nextPageToken;
