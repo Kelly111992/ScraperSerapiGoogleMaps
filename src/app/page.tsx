@@ -217,15 +217,12 @@ export default function Home() {
       // Construct query with location context
       // Combining them improves relevance in Google Maps Search
       const fullQuery = location ? `${query} en ${location}` : query;
-
       console.log(`Searching for: ${fullQuery}`);
 
       const params: any = {
-        engine: 'google',
-        tbm: 'lcl',
-        q: query,
-        location: location || 'Mexico',
-        hl: 'es',
+        engine: 'google_maps',
+        type: 'search',
+        q: fullQuery,
         gl: 'mx',
         google_domain: 'google.com.mx'
       };
@@ -277,11 +274,9 @@ export default function Home() {
     try {
       const fullQuery = currentLocation ? `${currentQuery} en ${currentLocation}` : currentQuery;
       const params: any = {
-        engine: 'google',
-        tbm: 'lcl',
-        q: currentQuery,
-        location: currentLocation || 'Mexico',
-        hl: 'es',
+        engine: 'google_maps',
+        type: 'search',
+        q: fullQuery,
         gl: 'mx',
         google_domain: 'google.com.mx'
       };
